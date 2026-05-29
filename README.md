@@ -1,4 +1,4 @@
-# Deterministic Agentic ITR Platform
+# Agentic ITR Platform
 
 An enterprise-grade Indian Income Tax Return (ITR) classification platform that combines a deterministic tax-rule engine with a strictly assistive agentic layer. The system is designed to select the correct ITR form using versioned rules, preserve auditability through reason codes, and use AI only for normalization, clarification, and explanation.
 
