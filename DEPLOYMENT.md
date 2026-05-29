@@ -59,6 +59,13 @@ Full-stack/same-origin deployment:
 
 - Leave `NEXT_PUBLIC_API_BASE_URL` empty or unset so the browser calls `/v1/*`
 - `BACKEND_INTERNAL_URL` defaults to `http://127.0.0.1:8000`
+- If the frontend container should call a separately deployed backend, pass it at build time:
+
+```bash
+docker build \
+  --build-arg BACKEND_INTERNAL_URL=https://your-backend-service.run.app \
+  -t itr-platform .
+```
 
 ## HTTPS
 
