@@ -8,7 +8,9 @@ from pydantic import ValidationError
 from app.api.routes import router
 from app.core.config import get_settings
 from app.core.errors import (
+    InvalidSchemaError,
     internal_exception_handler,
+    invalid_schema_exception_handler,
     pydantic_validation_exception_handler,
     validation_exception_handler,
 )
@@ -36,6 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(InvalidSchemaError, invalid_schema_exception_handler)
 app.add_exception_handler(ValidationError, pydantic_validation_exception_handler)
 app.add_exception_handler(Exception, internal_exception_handler)
 app.include_router(router, prefix="/v1")

@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from app.core.errors import InvalidSchemaError
 from app.models.tax_profile import CanonicalTaxProfile
 
 
@@ -11,12 +12,21 @@ def normalize_raw_user_data(raw_data: dict[str, Any]) -> CanonicalTaxProfile:
     This is intentionally deterministic and simple. It only maps known fields
     and fills unknowns so the rules engine can report missing/ambiguous items.
     """
-    salary_income = _number(raw_data.get("salary_income", 0))
-    ltcg_112a_amount = _number(raw_data.get("ltcg_112a_amount", 0))
-    capital_gains_income = _number(raw_data.get("capital_gains_income", ltcg_112a_amount))
-    business_income = _number(raw_data.get("business_profession_income", 0))
-    other_income = _number(raw_data.get("other_sources_income", 0))
-    house_property_income = _number(raw_data.get("house_property_income", 0))
+    salary_income = _number(raw_data.get("salary_income", 0), ("salary_income",))
+    ltcg_112a_amount = _number(raw_data.get("ltcg_112a_amount", 0), ("ltcg_112a_amount",))
+    capital_gains_income = _number(
+        raw_data.get("capital_gains_income", ltcg_112a_amount),
+        ("capital_gains_income",),
+    )
+    business_income = _number(
+        raw_data.get("business_profession_income", 0),
+        ("business_profession_income",),
+    )
+    other_income = _number(raw_data.get("other_sources_income", 0), ("other_sources_income",))
+    house_property_income = _number(
+        raw_data.get("house_property_income", 0),
+        ("house_property_income",),
+    )
 
     profile = {
         "schema_version": "canonical-tax-profile/v0.1",
@@ -41,7 +51,10 @@ def normalize_raw_user_data(raw_data: dict[str, Any]) -> CanonicalTaxProfile:
                     house_property_income,
                     raw_data.get("house_property_has_income"),
                 ),
-                "property_count": _optional_int(raw_data.get("house_property_count")),
+                "property_count": _optional_int(
+                    raw_data.get("house_property_count"),
+                    ("house_property_count",),
+                ),
                 "has_self_occupied_property": raw_data.get(
                     "has_self_occupied_property", "unknown"
                 ),
@@ -76,13 +89,14 @@ def normalize_raw_user_data(raw_data: dict[str, Any]) -> CanonicalTaxProfile:
                     "has_winnings_or_lottery_income", "no"
                 ),
                 "agricultural_income_amount": _number(
-                    raw_data.get("agricultural_income_amount", 0)
+                    raw_data.get("agricultural_income_amount", 0),
+                    ("agricultural_income_amount",),
                 ),
             },
         },
         "deductions": {
             "has_deductions": raw_data.get("has_deductions", "unknown"),
-            "section_claims": raw_data.get("section_claims", []),
+            "section_claims": _normalize_section_claims(raw_data.get("section_claims", [])),
         },
         "foreign_assets": {
             "has_foreign_assets": raw_data.get("has_foreign_assets", "unknown"),
@@ -125,13 +139,60 @@ def _income_head_with_explicit_status(value: float, has_income: Any) -> dict[str
     return _income_head(value)
 
 
-def _number(value: Any) -> float:
-    if value in (None, ""):
+def _number(value: Any, path: tuple[str | int, ...]) -> float:
+    if _is_empty_numeric(value):
         return 0
-    return float(value)
+    if isinstance(value, str):
+        value = value.strip()
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        raise _invalid_numeric(path, "number") from None
 
 
-def _optional_int(value: Any) -> int | None:
-    if value in (None, ""):
+def _optional_int(value: Any, path: tuple[str | int, ...]) -> int | None:
+    if _is_empty_numeric(value):
         return None
-    return int(value)
+    if isinstance(value, str):
+        value = value.strip()
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        raise _invalid_numeric(path, "integer") from None
+
+
+def _normalize_section_claims(section_claims: Any) -> Any:
+    if not isinstance(section_claims, list):
+        return section_claims
+
+    normalized_claims = []
+    for index, claim in enumerate(section_claims):
+        if not isinstance(claim, dict):
+            normalized_claims.append(claim)
+            continue
+
+        normalized_claim = dict(claim)
+        if "amount" in normalized_claim:
+            normalized_claim["amount"] = _number(
+                normalized_claim["amount"],
+                ("section_claims", index, "amount"),
+            )
+        normalized_claims.append(normalized_claim)
+
+    return normalized_claims
+
+
+def _is_empty_numeric(value: Any) -> bool:
+    return value is None or (isinstance(value, str) and value.strip() == "")
+
+
+def _invalid_numeric(path: tuple[str | int, ...], expected_type: str) -> InvalidSchemaError:
+    return InvalidSchemaError(
+        [
+            {
+                "type": f"{expected_type}_parsing",
+                "loc": ["body", *path],
+                "msg": f"Input should be a valid {expected_type}",
+            }
+        ]
+    )
