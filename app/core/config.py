@@ -1,0 +1,32 @@
+"""Environment-backed runtime configuration."""
+
+from functools import lru_cache
+from os import getenv
+
+
+class Settings:
+    api_base_url: str
+    debug: bool
+    environment: str
+    rate_limit_per_minute: int
+    max_request_bytes: int
+    cors_allowed_origins: list[str]
+
+    def __init__(self) -> None:
+        self.api_base_url = getenv("API_BASE_URL", "http://127.0.0.1:8000")
+        self.debug = getenv("DEBUG", "false").lower() in {"1", "true", "yes", "on"}
+        self.environment = getenv("ENVIRONMENT", "development")
+        self.rate_limit_per_minute = int(getenv("RATE_LIMIT_PER_MINUTE", "120"))
+        self.max_request_bytes = int(getenv("MAX_REQUEST_BYTES", "1048576"))
+        self.cors_allowed_origins = _csv(
+            getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+        )
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+
+def _csv(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]

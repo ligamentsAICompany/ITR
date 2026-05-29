@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "canonical-tax-profile/v0.1",
+  "title": "Canonical Tax Profile",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "assessment_year",
+    "previous_year",
+    "return_filing_reason",
+    "is_defective_return_case",
+    "user_identity",
+    "entity_type",
+    "residency_status",
+    "income_heads",
+    "deductions",
+    "foreign_assets",
+    "exemptions_flags",
+    "special_conditions"
+  ],
+  "properties": {
+    "schema_version": { "const": "canonical-tax-profile/v0.1" },
+    "assessment_year": { "type": "string", "pattern": "^20\\d{2}-\\d{2}$" },
+    "previous_year": { "type": "string", "pattern": "^20\\d{2}-\\d{2}$" },
+    "return_filing_reason": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["voluntary", "mandatory", "notice", "unknown"] }
+      }
+    },
+    "is_defective_return_case": { "$ref": "#/$defs/yesNoUnknown" },
+    "user_identity": {
+      "type": "object",
+      "required": ["pan"],
+      "properties": {
+        "pan": { "type": "string", "pattern": "^[A-Z]{5}[0-9]{4}[A-Z]$" },
+        "aadhaar_number": { "type": "string", "pattern": "^[0-9]{12}$" }
+      }
+    },
+    "entity_type": {
+      "enum": ["individual", "huf", "firm", "llp", "company", "trust", "society", "aop", "boi", "local_authority", "cooperative_society", "ajp", "estate", "business_trust", "investment_fund", "representative_assessee", "other"]
+    },
+    "residency_status": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["resident", "rnor", "non_resident", "unknown"] }
+      }
+    },
+    "income_heads": {
+      "type": "object",
+      "required": ["salary", "house_property", "capital_gains", "business_profession", "other_sources"],
+      "properties": {
+        "salary": { "$ref": "#/$defs/incomeHead" },
+        "house_property": { "$ref": "#/$defs/incomeHead" },
+        "capital_gains": {
+          "allOf": [{ "$ref": "#/$defs/incomeHead" }],
+          "properties": {
+            "has_stcg": { "$ref": "#/$defs/yesNoUnknown" },
+            "has_ltcg_112a": { "$ref": "#/$defs/yesNoUnknown" },
+            "ltcg_112a_amount": { "type": "number", "minimum": 0 },
+            "has_other_ltcg": { "$ref": "#/$defs/yesNoUnknown" },
+            "has_land_building_gains": { "$ref": "#/$defs/yesNoUnknown" },
+            "has_special_rate_capital_gains": { "$ref": "#/$defs/yesNoUnknown" }
+          }
+        },
+        "business_profession": {
+          "allOf": [{ "$ref": "#/$defs/incomeHead" }],
+          "properties": {
+            "nature": { "enum": ["business", "profession", "both", "unknown"] },
+            "presumptive_taxation": { "$ref": "#/$defs/yesNoUnknown" }
+          }
+        },
+        "other_sources": {
+          "allOf": [{ "$ref": "#/$defs/incomeHead" }],
+          "properties": {
+            "has_interest_income": { "$ref": "#/$defs/yesNoUnknown" },
+            "has_winnings_or_lottery_income": { "$ref": "#/$defs/yesNoUnknown" },
+            "agricultural_income_amount": { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "yesNoUnknown": { "enum": ["yes", "no", "unknown"] },
+    "incomeHead": {
+      "type": "object",
+      "required": ["has_income", "gross_amount"],
+      "properties": {
+        "has_income": { "$ref": "#/$defs/yesNoUnknown" },
+        "gross_amount": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}
