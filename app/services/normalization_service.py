@@ -16,6 +16,7 @@ def normalize_raw_user_data(raw_data: dict[str, Any]) -> CanonicalTaxProfile:
     capital_gains_income = _number(raw_data.get("capital_gains_income", ltcg_112a_amount))
     business_income = _number(raw_data.get("business_profession_income", 0))
     other_income = _number(raw_data.get("other_sources_income", 0))
+    house_property_income = _number(raw_data.get("house_property_income", 0))
 
     profile = {
         "schema_version": "canonical-tax-profile/v0.1",
@@ -35,7 +36,17 @@ def normalize_raw_user_data(raw_data: dict[str, Any]) -> CanonicalTaxProfile:
         },
         "income_heads": {
             "salary": _income_head(salary_income),
-            "house_property": _income_head(_number(raw_data.get("house_property_income", 0))),
+            "house_property": {
+                **_income_head_with_explicit_status(
+                    house_property_income,
+                    raw_data.get("house_property_has_income"),
+                ),
+                "property_count": _optional_int(raw_data.get("house_property_count")),
+                "has_self_occupied_property": raw_data.get(
+                    "has_self_occupied_property", "unknown"
+                ),
+                "has_let_out_property": raw_data.get("has_let_out_property", "unknown"),
+            },
             "capital_gains": {
                 **_income_head(capital_gains_income),
                 "has_stcg": raw_data.get("has_stcg", "no"),
@@ -108,7 +119,19 @@ def _income_head(value: float) -> dict[str, Any]:
     return {"has_income": "yes" if value > 0 else "no", "gross_amount": value}
 
 
+def _income_head_with_explicit_status(value: float, has_income: Any) -> dict[str, Any]:
+    if has_income in ("yes", "no", "unknown"):
+        return {"has_income": has_income, "gross_amount": value}
+    return _income_head(value)
+
+
 def _number(value: Any) -> float:
     if value in (None, ""):
         return 0
     return float(value)
+
+
+def _optional_int(value: Any) -> int | None:
+    if value in (None, ""):
+        return None
+    return int(value)

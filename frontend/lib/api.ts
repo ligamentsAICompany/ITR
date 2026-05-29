@@ -40,6 +40,14 @@ export function normalizeProfile(form: BasicFormState): Promise<CanonicalTaxProf
     entity_type: form.entityType,
     residency_status: form.residency,
     salary_income: Number(form.salaryIncome || 0),
+    house_property_has_income: form.housePropertyHasIncome,
+    house_property_income: Number(form.housePropertyIncome || 0),
+    house_property_count:
+      form.housePropertyHasIncome === "yes" && form.housePropertyCount !== ""
+        ? Number(form.housePropertyCount)
+        : undefined,
+    has_self_occupied_property: form.hasSelfOccupiedProperty,
+    has_let_out_property: form.hasLetOutProperty,
     business_profession_income: Number(form.businessProfessionIncome || 0),
     capital_gains_income: Number(form.capitalGainsIncome || form.ltcg112AAmount || 0),
     has_stcg: form.hasStcg,
@@ -61,10 +69,10 @@ export function normalizeProfile(form: BasicFormState): Promise<CanonicalTaxProf
     capital_gains_edge_case: form.capitalGainsEdgeCase,
     low_confidence_extraction: form.capitalGainsEdgeCase,
     section_claims: [
-      ...(form.has80C === "yes" ? [{ section_code: "80C", amount: 0 }] : []),
-      ...(form.has80D === "yes" ? [{ section_code: "80D", amount: 0 }] : []),
+      ...(form.has80C === "yes" ? [{ section_code: "80C", amount: Number(form.deduction80CAmount) }] : []),
+      ...(form.has80D === "yes" ? [{ section_code: "80D", amount: Number(form.deduction80DAmount) }] : []),
     ],
-    has_deductions: form.has80C === "yes" || form.has80D === "yes" ? "yes" : "no",
+    has_deductions: form.has80C === "yes" || form.has80D === "yes" ? "yes" : form.hasDeductions,
   });
 }
 
