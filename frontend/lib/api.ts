@@ -5,6 +5,7 @@ import type {
   ExplanationResponse,
   ITRDecisionResponse,
 } from "@/types/itr";
+import { normalizeAadhaar } from "./aadhaar";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
@@ -32,9 +33,11 @@ async function postJson<TResponse>(path: string, payload: unknown): Promise<TRes
 }
 
 export function normalizeProfile(form: BasicFormState): Promise<CanonicalTaxProfile> {
+  const aadhaarNumber = normalizeAadhaar(form.aadhaar);
+
   return postJson<CanonicalTaxProfile>("/v1/normalize", {
     pan: form.pan,
-    aadhaar_number: form.aadhaar || undefined,
+    aadhaar_number: aadhaarNumber || undefined,
     assessment_year: "2026-27",
     previous_year: form.previousYear || undefined,
     entity_type: form.entityType,

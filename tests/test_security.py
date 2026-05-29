@@ -32,6 +32,25 @@ def test_normalize_bad_pan_returns_400_without_echoing_sensitive_values():
     assert "123456789012" not in body
 
 
+def test_normalize_bad_aadhaar_returns_400_if_frontend_is_bypassed():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "ABCDE1234F",
+            "aadhaar_number": "12345",
+            "assessment_year": "2026-27",
+            "entity_type": "individual",
+            "residency_status": "resident",
+        },
+    )
+
+    body = response.text
+    assert response.status_code == 400
+    assert "invalid_schema" in body
+    assert "aadhaar_number" in body
+    assert "12345" not in body
+
+
 def test_malformed_json_is_rejected_early():
     response = client.post(
         "/v1/normalize",

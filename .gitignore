@@ -9,6 +9,7 @@ __pycache__/
 
 frontend/node_modules/
 frontend/.next/
+frontend/.test-build/
 frontend/out/
 frontend/.env*
 

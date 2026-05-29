@@ -15,7 +15,9 @@ import {
   getMissingFields,
   normalizeProfile,
 } from "@/lib/api";
+import { validateAadhaar } from "@/lib/aadhaar";
 import { maskSensitiveProfile } from "@/lib/security";
+import { validateWorkflowInput } from "@/lib/workflowValidation";
 import type {
   BasicFormState,
   CanonicalTaxProfile,
@@ -86,6 +88,7 @@ export default function Home() {
     () => getProgressState({ decision, explanation, clarification, missingFields, escalation, loading, error }),
     [decision, explanation, clarification, missingFields, escalation, loading, error],
   );
+  const aadhaarError = useMemo(() => validateAadhaar(form.aadhaar).error, [form.aadhaar]);
 
   function updateForm(field: keyof BasicFormState, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -112,7 +115,7 @@ export default function Home() {
     setUnresolvedFields(nextUnresolvedFields);
 
     try {
-      const validationError = validateForm(nextForm);
+      const validationError = validateWorkflowInput(nextForm);
       if (validationError) {
         setError(validationError);
         pushLog(`validation: ${validationError}`);
@@ -238,6 +241,7 @@ export default function Home() {
             form={form}
             missingFields={missingFields}
             disabled={loading}
+            aadhaarError={aadhaarError}
             onChange={updateForm}
             onSubmit={() => void runWorkflow()}
           />
@@ -296,32 +300,6 @@ function normalizeYesNo(value: string): "yes" | "no" | "unknown" {
     return "no";
   }
   return "unknown";
-}
-
-function validateForm(form: BasicFormState): string | null {
-  if (form.housePropertyHasIncome === "yes") {
-    const propertyCount = Number(form.housePropertyCount);
-    if (!Number.isFinite(propertyCount) || propertyCount < 1) {
-      return "Please enter the number of house properties when house property income/details are marked yes.";
-    }
-  }
-
-  if (form.has80C === "yes" && !isValidAmount(form.deduction80CAmount)) {
-    return "Please enter a valid Section 80C deduction amount.";
-  }
-  if (form.has80D === "yes" && !isValidAmount(form.deduction80DAmount)) {
-    return "Please enter a valid Section 80D deduction amount.";
-  }
-
-  return null;
-}
-
-function isValidAmount(value: string): boolean {
-  if (value.trim() === "") {
-    return false;
-  }
-  const amount = Number(value);
-  return Number.isFinite(amount) && amount >= 0;
 }
 
 function normalizeSelectAnswer(value: string, allowed: string[]): string {

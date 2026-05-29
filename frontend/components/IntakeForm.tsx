@@ -1,9 +1,11 @@
 import type { BasicFormState, YesNoUnknown } from "@/types/itr";
+import { AADHAAR_INPUT_MAX_LENGTH } from "@/lib/aadhaar";
 
 type IntakeFormProps = {
   form: BasicFormState;
   missingFields: string[];
   disabled: boolean;
+  aadhaarError: string | null;
   onChange: (field: keyof BasicFormState, value: string) => void;
   onSubmit: () => void;
 };
@@ -13,7 +15,14 @@ const inputClass =
 
 const labelClass = "text-sm font-medium text-gray-700";
 
-export function IntakeForm({ form, missingFields, disabled, onChange, onSubmit }: IntakeFormProps) {
+export function IntakeForm({
+  form,
+  missingFields,
+  disabled,
+  aadhaarError,
+  onChange,
+  onSubmit,
+}: IntakeFormProps) {
   const showPreviousYear = missingFields.includes("previous_year") || form.previousYear;
   const showReturnReason =
     missingFields.includes("return_filing_reason.type") || form.returnFilingReason !== "unknown";
@@ -46,6 +55,11 @@ export function IntakeForm({ form, missingFields, disabled, onChange, onSubmit }
           label="Aadhaar"
           value={form.aadhaar}
           disabled={disabled}
+          inputMode="numeric"
+          maxLength={AADHAAR_INPUT_MAX_LENGTH}
+          placeholder="Example: 1234 5678 9012"
+          helpText="Optional. Use 12 digits, with or without spaces."
+          errorText={aadhaarError}
           onChange={(value) => onChange("aadhaar", value)}
         />
         <SelectInput
@@ -354,8 +368,10 @@ function TextInput({
   disabled,
   animated,
   inputMode,
+  maxLength,
   placeholder,
   helpText,
+  errorText,
   onChange,
 }: {
   label: string;
@@ -363,8 +379,10 @@ function TextInput({
   disabled: boolean;
   animated?: boolean;
   inputMode?: "numeric";
+  maxLength?: number;
   placeholder?: string;
   helpText?: string;
+  errorText?: string | null;
   onChange: (value: string) => void;
 }) {
   return (
@@ -375,9 +393,12 @@ function TextInput({
         value={value}
         disabled={disabled}
         inputMode={inputMode}
+        maxLength={maxLength}
         placeholder={placeholder}
+        aria-invalid={errorText ? true : undefined}
         onChange={(event) => onChange(event.target.value)}
       />
+      {errorText ? <span className="mt-1 block text-xs font-medium text-red-600">{errorText}</span> : null}
       {helpText ? <span className="mt-1 block text-xs text-gray-500">{helpText}</span> : null}
     </label>
   );
