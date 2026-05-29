@@ -2,7 +2,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.backend
     environment:
       API_BASE_URL: http://backend:8000
       DEBUG: "false"
@@ -26,6 +26,7 @@ services:
       dockerfile: Dockerfile
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      BACKEND_INTERNAL_URL: http://backend:8000
       NODE_ENV: production
     ports:
       - "3000:3000"

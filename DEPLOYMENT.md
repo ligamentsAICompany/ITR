@@ -1,5 +1,34 @@
 # Production Deployment
 
+## Single-Container Cloud Run Deployment
+
+The root `Dockerfile` builds a full-stack container:
+
+- Next.js frontend is served at `/`
+- FastAPI backend runs inside the same container
+- API traffic is proxied through the frontend server at `/v1/*`
+
+This is the correct Dockerfile to use when deploying one Cloud Run service:
+
+```bash
+docker build -t itr-platform .
+docker run --rm -p 8080:8080 itr-platform
+```
+
+Open:
+
+- Frontend: `http://localhost:8080`
+- Backend health through the same service: `http://localhost:8080/v1/health`
+
+## Backend-Only Dockerfile
+
+`Dockerfile.backend` is retained for backend-only deployments and for Docker Compose.
+
+```bash
+docker build -f Dockerfile.backend -t itr-backend .
+docker run --rm -p 8000:8000 itr-backend
+```
+
 ## Local Docker Compose
 
 ```bash
@@ -25,6 +54,11 @@ Backend:
 Frontend:
 
 - `NEXT_PUBLIC_API_BASE_URL`
+
+Full-stack/same-origin deployment:
+
+- Leave `NEXT_PUBLIC_API_BASE_URL` empty or unset so the browser calls `/v1/*`
+- `BACKEND_INTERNAL_URL` defaults to `http://127.0.0.1:8000`
 
 ## HTTPS
 
