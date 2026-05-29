@@ -7,6 +7,11 @@ export type BasicFormState = {
   entityType: string;
   residency: string;
   salaryIncome: string;
+  housePropertyHasIncome: YesNoUnknown;
+  housePropertyIncome: string;
+  housePropertyCount: string;
+  hasSelfOccupiedProperty: YesNoUnknown;
+  hasLetOutProperty: YesNoUnknown;
   businessProfessionIncome: string;
   capitalGainsIncome: string;
   hasStcg: YesNoUnknown;
@@ -27,8 +32,11 @@ export type BasicFormState = {
   unlistedEquityHeld: YesNoUnknown;
   broughtForwardLosses: YesNoUnknown;
   capitalGainsEdgeCase: YesNoUnknown;
+  hasDeductions: YesNoUnknown;
   has80C: YesNoUnknown;
+  deduction80CAmount: string;
   has80D: YesNoUnknown;
+  deduction80DAmount: string;
 };
 
 export type CanonicalTaxProfile = Record<string, unknown>;

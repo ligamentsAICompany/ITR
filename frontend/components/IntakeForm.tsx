@@ -21,6 +21,9 @@ export function IntakeForm({ form, missingFields, disabled, onChange, onSubmit }
     missingFields.includes("is_defective_return_case") || form.isDefectiveReturnCase !== "unknown";
   const showForeign = true;
   const showPresumptive = true;
+  const showHousePropertyDetails =
+    form.housePropertyHasIncome === "yes" || Number(form.housePropertyIncome || 0) > 0;
+  const showDeductionSections = form.hasDeductions === "yes" || form.has80C === "yes" || form.has80D === "yes";
 
   return (
     <section className="rounded-2xl border border-[#e5e7eb] bg-white p-6 shadow-sm">
@@ -78,6 +81,46 @@ export function IntakeForm({ form, missingFields, disabled, onChange, onSubmit }
           inputMode="numeric"
           onChange={(value) => onChange("salaryIncome", value)}
         />
+        <YesNoInput
+          label="House Property Income / Details"
+          value={form.housePropertyHasIncome}
+          disabled={disabled}
+          onChange={(value) => onChange("housePropertyHasIncome", value)}
+        />
+        {showHousePropertyDetails ? (
+          <>
+            <TextInput
+              label="House Property Gross Amount"
+              value={form.housePropertyIncome}
+              disabled={disabled}
+              inputMode="numeric"
+              placeholder="Example: 0 for self-occupied property"
+              helpText="Use 0 when details exist but there is no taxable house-property amount."
+              onChange={(value) => onChange("housePropertyIncome", value)}
+            />
+            <TextInput
+              label="Number of House Properties"
+              value={form.housePropertyCount}
+              disabled={disabled}
+              inputMode="numeric"
+              placeholder="Example: 1"
+              helpText="Needed to distinguish simple one-property ITR-1 cases from complex property cases."
+              onChange={(value) => onChange("housePropertyCount", value)}
+            />
+            <YesNoInput
+              label="Self-occupied House Property"
+              value={form.hasSelfOccupiedProperty}
+              disabled={disabled}
+              onChange={(value) => onChange("hasSelfOccupiedProperty", value)}
+            />
+            <YesNoInput
+              label="Let-out House Property"
+              value={form.hasLetOutProperty}
+              disabled={disabled}
+              onChange={(value) => onChange("hasLetOutProperty", value)}
+            />
+          </>
+        ) : null}
         <TextInput
           label="Business / Profession Income"
           value={form.businessProfessionIncome}
@@ -238,17 +281,49 @@ export function IntakeForm({ form, missingFields, disabled, onChange, onSubmit }
           onChange={(value) => onChange("capitalGainsEdgeCase", value)}
         />
         <YesNoInput
-          label="Section 80C"
-          value={form.has80C}
+          label="Deductions Claimed"
+          value={form.hasDeductions}
           disabled={disabled}
-          onChange={(value) => onChange("has80C", value)}
+          onChange={(value) => onChange("hasDeductions", value)}
         />
-        <YesNoInput
-          label="Section 80D"
-          value={form.has80D}
-          disabled={disabled}
-          onChange={(value) => onChange("has80D", value)}
-        />
+        {showDeductionSections ? (
+          <>
+            <YesNoInput
+              label="Section 80C"
+              value={form.has80C}
+              disabled={disabled}
+              onChange={(value) => onChange("has80C", value)}
+            />
+            {form.has80C === "yes" ? (
+              <TextInput
+                label="Section 80C Amount"
+                value={form.deduction80CAmount}
+                disabled={disabled}
+                inputMode="numeric"
+                placeholder="Example: 150000"
+                helpText="Enter the actual amount claimed. Leave 80C as No if there is no claim."
+                onChange={(value) => onChange("deduction80CAmount", value)}
+              />
+            ) : null}
+            <YesNoInput
+              label="Section 80D"
+              value={form.has80D}
+              disabled={disabled}
+              onChange={(value) => onChange("has80D", value)}
+            />
+            {form.has80D === "yes" ? (
+              <TextInput
+                label="Section 80D Amount"
+                value={form.deduction80DAmount}
+                disabled={disabled}
+                inputMode="numeric"
+                placeholder="Example: 25000"
+                helpText="Enter the actual medical insurance deduction amount claimed."
+                onChange={(value) => onChange("deduction80DAmount", value)}
+              />
+            ) : null}
+          </>
+        ) : null}
       </div>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -279,6 +354,7 @@ function TextInput({
   disabled,
   animated,
   inputMode,
+  placeholder,
   helpText,
   onChange,
 }: {
@@ -287,6 +363,7 @@ function TextInput({
   disabled: boolean;
   animated?: boolean;
   inputMode?: "numeric";
+  placeholder?: string;
   helpText?: string;
   onChange: (value: string) => void;
 }) {
@@ -298,6 +375,7 @@ function TextInput({
         value={value}
         disabled={disabled}
         inputMode={inputMode}
+        placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
       />
       {helpText ? <span className="mt-1 block text-xs text-gray-500">{helpText}</span> : null}

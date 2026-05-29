@@ -84,6 +84,93 @@ def test_normalize_returns_canonical_profile_defaults_for_partial_input():
     assert response.headers["x-trace-id"]
 
 
+def test_normalize_preserves_house_property_details_from_ui_payload():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "abcde1234f",
+            "assessment_year": "2026-27",
+            "previous_year": "2025-26",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "salary_income": 1200000,
+            "house_property_has_income": "yes",
+            "house_property_income": 0,
+            "house_property_count": 1,
+            "has_self_occupied_property": "yes",
+            "has_let_out_property": "no",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    house_property = payload["income_heads"]["house_property"]
+    assert house_property["has_income"] == "yes"
+    assert house_property["gross_amount"] == 0
+    assert house_property["property_count"] == 1
+    assert house_property["has_self_occupied_property"] == "yes"
+    assert house_property["has_let_out_property"] == "no"
+
+
+def test_normalize_preserves_deduction_amounts_from_ui_payload():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "abcde1234f",
+            "assessment_year": "2026-27",
+            "previous_year": "2025-26",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "salary_income": 1200000,
+            "has_deductions": "yes",
+            "section_claims": [
+                {"section_code": "80C", "amount": 150000},
+                {"section_code": "80D", "amount": 25000},
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["deductions"]["has_deductions"] == "yes"
+    assert payload["deductions"]["section_claims"] == [
+        {"section_code": "80C", "amount": 150000},
+        {"section_code": "80D", "amount": 25000},
+    ]
+
+
+def test_normalize_keeps_capital_gains_subtype_mapping():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "abcde1234f",
+            "assessment_year": "2026-27",
+            "previous_year": "2025-26",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "salary_income": 1200000,
+            "capital_gains_income": 100000,
+            "has_stcg": "no",
+            "has_ltcg_112a": "yes",
+            "ltcg_112a_amount": 100000,
+            "has_other_ltcg": "no",
+            "has_land_building_gains": "no",
+            "has_special_rate_capital_gains": "no",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    capital_gains = payload["income_heads"]["capital_gains"]
+    assert capital_gains["has_income"] == "yes"
+    assert capital_gains["has_ltcg_112a"] == "yes"
+    assert capital_gains["ltcg_112a_amount"] == 100000
+    assert capital_gains["has_stcg"] == "no"
+    assert capital_gains["has_other_ltcg"] == "no"
+    assert capital_gains["has_land_building_gains"] == "no"
+    assert capital_gains["has_special_rate_capital_gains"] == "no"
+
+
 def test_itr_decision_wraps_existing_deterministic_classifier():
     response = client.post(
         "/v1/itr-decision",

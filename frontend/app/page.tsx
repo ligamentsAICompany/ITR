@@ -32,6 +32,11 @@ const initialForm: BasicFormState = {
   entityType: "individual",
   residency: "resident",
   salaryIncome: "1200000",
+  housePropertyHasIncome: "no",
+  housePropertyIncome: "0",
+  housePropertyCount: "0",
+  hasSelfOccupiedProperty: "no",
+  hasLetOutProperty: "no",
   businessProfessionIncome: "0",
   capitalGainsIncome: "0",
   hasStcg: "no",
@@ -52,8 +57,11 @@ const initialForm: BasicFormState = {
   unlistedEquityHeld: "no",
   broughtForwardLosses: "no",
   capitalGainsEdgeCase: "no",
+  hasDeductions: "no",
   has80C: "no",
+  deduction80CAmount: "",
   has80D: "no",
+  deduction80DAmount: "",
 };
 
 export default function Home() {
@@ -104,6 +112,13 @@ export default function Home() {
     setUnresolvedFields(nextUnresolvedFields);
 
     try {
+      const validationError = validateForm(nextForm);
+      if (validationError) {
+        setError(validationError);
+        pushLog(`validation: ${validationError}`);
+        return;
+      }
+
       pushLog("normalize: POST /v1/normalize");
       const normalized = await normalizeProfile(nextForm);
       setProfile(normalized);
@@ -183,6 +198,8 @@ export default function Home() {
       nextForm.returnFilingReason = normalizeSelectAnswer(trimmed, ["voluntary", "mandatory", "notice"]);
     } else if (firstMissing === "is_defective_return_case") {
       nextForm.isDefectiveReturnCase = normalizeYesNo(trimmed);
+    } else if (firstMissing === "income_heads.house_property.has_income") {
+      nextForm.housePropertyHasIncome = normalizeYesNo(trimmed);
     } else if (firstMissing === "foreign_assets.has_foreign_assets") {
       nextForm.hasForeignAssets = normalizeYesNo(trimmed);
     } else if (firstMissing === "foreign_assets.has_foreign_income") {
@@ -279,6 +296,32 @@ function normalizeYesNo(value: string): "yes" | "no" | "unknown" {
     return "no";
   }
   return "unknown";
+}
+
+function validateForm(form: BasicFormState): string | null {
+  if (form.housePropertyHasIncome === "yes") {
+    const propertyCount = Number(form.housePropertyCount);
+    if (!Number.isFinite(propertyCount) || propertyCount < 1) {
+      return "Please enter the number of house properties when house property income/details are marked yes.";
+    }
+  }
+
+  if (form.has80C === "yes" && !isValidAmount(form.deduction80CAmount)) {
+    return "Please enter a valid Section 80C deduction amount.";
+  }
+  if (form.has80D === "yes" && !isValidAmount(form.deduction80DAmount)) {
+    return "Please enter a valid Section 80D deduction amount.";
+  }
+
+  return null;
+}
+
+function isValidAmount(value: string): boolean {
+  if (value.trim() === "") {
+    return false;
+  }
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0;
 }
 
 function normalizeSelectAnswer(value: string, allowed: string[]): string {
