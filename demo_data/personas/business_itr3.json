@@ -1,0 +1,34 @@
+{
+  "id": "business_itr3",
+  "data_classification": "synthetic_demo_only",
+  "live_filing_enabled": false,
+  "scenario": "Resident proprietor with business income and capital gains",
+  "candidate_itr": "ITR-3",
+  "taxpayer": {
+    "name": "Demo Business Owner",
+    "pan": "BUSIN1234K",
+    "aadhaar": "666655554444",
+    "residency": "resident",
+    "entity_type": "individual"
+  },
+  "income": {
+    "business_profession": 1450000,
+    "capital_gains": 180000,
+    "other_sources_interest": 42000,
+    "foreign_assets": false
+  },
+  "deductions": {
+    "section_80c": 150000,
+    "section_80d": 45000
+  },
+  "tax_paid": {
+    "advance_tax": 210000,
+    "tds_other": 38000
+  },
+  "documents": [
+    "documents/ais_sample.csv",
+    "documents/form26as_sample.csv",
+    "documents/capital_gains_sample.csv"
+  ],
+  "demo_notes": "Complex pilot scenario for classification discussion; use mock filing readiness only."
+}

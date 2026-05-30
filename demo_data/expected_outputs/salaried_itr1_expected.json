@@ -1,0 +1,16 @@
+{
+  "id": "salaried_itr1_expected",
+  "data_classification": "synthetic_demo_only",
+  "live_filing_enabled": false,
+  "candidate_itr": "ITR-1",
+  "validation_status": "ready_with_reviewer_check",
+  "tax_computation_summary": {
+    "income_profile": "salary_plus_interest",
+    "selected_regime": "demo_default",
+    "estimated_result": "refund_or_low_payable_subject_to_review"
+  },
+  "filing_package_status": "draft_package_ready",
+  "export_status": "schema_export_preview_ready",
+  "mock_filing_status": "mock_readiness_available_live_disabled",
+  "provider_diagnostics_status": "mock_or_sandbox_not_verified_until_credentials_approved"
+}

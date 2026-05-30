@@ -1,0 +1,16 @@
+{
+  "id": "foreign_assets_itr2_expected",
+  "data_classification": "synthetic_demo_only",
+  "live_filing_enabled": false,
+  "candidate_itr": "ITR-2",
+  "validation_status": "needs_reviewer_attention",
+  "tax_computation_summary": {
+    "income_profile": "salary_capital_gains_foreign_asset_flag",
+    "selected_regime": "demo_default",
+    "estimated_result": "payable_subject_to_reviewer_and_disclosure_review"
+  },
+  "filing_package_status": "draft_package_blocked_until_reviewer_approval",
+  "export_status": "schema_export_preview_ready_after_validation",
+  "mock_filing_status": "mock_readiness_available_live_disabled",
+  "provider_diagnostics_status": "mock_or_sandbox_not_verified_until_credentials_approved"
+}

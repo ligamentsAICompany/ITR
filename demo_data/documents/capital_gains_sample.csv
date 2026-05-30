@@ -1,0 +1,4 @@
+asset_type,sale_value,cost_value,gain_type,gain_amount,source_note
+listed_equity,850000,650000,ltcg_112a,200000,Synthetic broker statement
+equity_mutual_fund,420000,300000,stcg,120000,Synthetic broker statement
+business_asset,600000,420000,other_ltcg,180000,Synthetic broker statement

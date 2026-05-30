@@ -1,0 +1,35 @@
+{
+  "id": "foreign_assets_itr2",
+  "data_classification": "synthetic_demo_only",
+  "live_filing_enabled": false,
+  "scenario": "Resident individual with capital gains and foreign asset disclosure flag",
+  "candidate_itr": "ITR-2",
+  "taxpayer": {
+    "name": "Demo Global Investor",
+    "pan": "FORGN1234H",
+    "aadhaar": "777766665555",
+    "residency": "resident",
+    "entity_type": "individual"
+  },
+  "income": {
+    "salary": 1600000,
+    "capital_gains": 320000,
+    "foreign_assets": true,
+    "foreign_income": false,
+    "business_profession": 0
+  },
+  "deductions": {
+    "section_80c": 150000,
+    "section_80d": 30000
+  },
+  "tax_paid": {
+    "tds_salary": 130000,
+    "advance_tax": 60000
+  },
+  "documents": [
+    "documents/form16_sample.csv",
+    "documents/capital_gains_sample.csv",
+    "documents/ais_sample.csv"
+  ],
+  "demo_notes": "Used to show escalation, reviewer attention, and mock readiness only for higher-risk disclosures."
+}

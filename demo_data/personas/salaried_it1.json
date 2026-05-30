@@ -1,0 +1,35 @@
+{
+  "id": "salaried_it1",
+  "data_classification": "synthetic_demo_only",
+  "live_filing_enabled": false,
+  "scenario": "Resident salaried individual with bank interest and 80C deductions",
+  "candidate_itr": "ITR-1",
+  "taxpayer": {
+    "name": "Demo Salaried User",
+    "pan": "ABCDE1234F",
+    "aadhaar": "999988887777",
+    "residency": "resident",
+    "entity_type": "individual"
+  },
+  "income": {
+    "salary": 1200000,
+    "other_sources_interest": 24000,
+    "capital_gains": 0,
+    "business_profession": 0,
+    "foreign_assets": false
+  },
+  "deductions": {
+    "section_80c": 150000,
+    "section_80d": 25000
+  },
+  "tax_paid": {
+    "tds_salary": 92000,
+    "tds_other": 2400
+  },
+  "documents": [
+    "documents/form16_sample.csv",
+    "documents/ais_sample.csv",
+    "documents/form26as_sample.csv"
+  ],
+  "demo_notes": "Use only in mock filing readiness demos; no real submission is possible."
+}

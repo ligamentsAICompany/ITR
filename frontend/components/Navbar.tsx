@@ -1,6 +1,13 @@
 export function Navbar() {
+  const showPilotBanner = process.env.NEXT_PUBLIC_SHOW_PILOT_STATUS_BANNER !== "false";
+
   return (
     <header className="sticky top-0 z-20 border-b border-[#e5e7eb] bg-white/95 backdrop-blur">
+      {showPilotBanner ? (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs font-medium text-amber-900 sm:text-sm">
+          Pilot mode: This platform prepares and validates tax filing data. Live government filing is disabled.
+        </div>
+      ) : null}
       <nav className="mx-auto flex max-w-[900px] items-center justify-between px-5 py-4">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#22c55e]">

@@ -1,0 +1,6 @@
+category,description,amount,source_note
+salary,Demo employer salary,1200000,Synthetic AIS
+interest,Savings bank interest,24000,Synthetic AIS
+professional_receipts,Freelance consulting receipts,1850000,Synthetic AIS
+capital_gains,Listed equity gains,320000,Synthetic AIS
+other_income,Business owner interest income,42000,Synthetic AIS
