@@ -143,22 +143,26 @@ class FilingService:
             self.submission_repository.save(submission)
             raise ValueError(f"Filing submission is blocked: {', '.join(readiness.blockers)}")
         provider = get_filing_provider()
-        validation = provider.validate_submission_package(package_id=submission.package_id, export_id=submission.export_id)
+        validation = provider.validate_export_payload(package_id=submission.package_id, export_id=submission.export_id, payload=None)
         if not validation.success:
             submission.submission_status = SubmissionStatus.SUBMISSION_FAILED
-            submission.failure_reason = validation.failure_reason or "Provider validation failed"
+            submission.failure_reason = validation.safe_message or validation.failure_reason or "Provider validation failed"
             submission.updated_at = datetime.now(UTC)
             self.submission_repository.save(submission)
             raise ValueError(submission.failure_reason)
         response = provider.submit_return(package_id=submission.package_id, export_id=submission.export_id, payload=None)
         if not response.success or not response.provider_reference_id:
             submission.submission_status = SubmissionStatus.SUBMISSION_FAILED
-            submission.failure_reason = response.failure_reason or "Provider submission failed"
+            submission.failure_reason = response.safe_message or response.failure_reason or "Provider submission failed"
             submission.updated_at = datetime.now(UTC)
             self.submission_repository.save(submission)
             raise ValueError(submission.failure_reason)
+        submission.provider = getattr(provider, "provider_name", submission.provider)
+        if submission.provider == "eri":
+            submission.provider = f"eri_{getattr(provider, 'provider_mode', submission.provider_mode)}"
+        submission.provider_mode = getattr(provider, "provider_mode", submission.provider_mode)
         submission.provider_reference_id = response.provider_reference_id
-        submission.submission_status = SubmissionStatus.SUBMITTED if response.status == "submitted" else SubmissionStatus.PENDING_VERIFICATION
+        submission.submission_status = response.normalized_status or (SubmissionStatus.SUBMITTED if response.status == "submitted" else SubmissionStatus.PENDING_VERIFICATION)
         submission.submitted_at = datetime.now(UTC)
         submission.updated_at = datetime.now(UTC)
         return self.submission_repository.save(submission)
@@ -195,8 +199,14 @@ class FilingService:
         self._require_access(session, submission)
         if not submission.provider_reference_id:
             raise ValueError("Submission has no provider reference")
-        response = get_filing_provider().initiate_everification(provider_reference_id=submission.provider_reference_id)
-        submission.everification_status = EVerificationStatus(response.status if response.success else "failed")
+        provider = get_filing_provider()
+        if not provider.supports_everification():
+            submission.everification_status = EVerificationStatus.FAILED
+            submission.failure_reason = "Provider e-verification is not supported for this mode"
+            submission.updated_at = datetime.now(UTC)
+            return self.submission_repository.save(submission)
+        response = provider.initiate_everification(provider_reference_id=submission.provider_reference_id)
+        submission.everification_status = EVerificationStatus(response.status if response.success and response.status in {item.value for item in EVerificationStatus} else "failed")
         submission.updated_at = datetime.now(UTC)
         return self.submission_repository.save(submission)
 

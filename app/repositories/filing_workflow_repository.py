@@ -110,6 +110,16 @@ class FilingSubmissionRepository:
         FILING_SUBMISSION_CACHE[submission.submission_id] = submission
         return submission
 
+    def get_by_provider_reference(self, provider_reference_id: str) -> FilingSubmission | None:
+        return next(
+            (
+                submission
+                for submission in FILING_SUBMISSION_CACHE.values()
+                if submission.provider_reference_id == provider_reference_id
+            ),
+            None,
+        )
+
 
 class AcknowledgementRepository:
     table = "filing_acknowledgements"

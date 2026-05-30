@@ -57,12 +57,57 @@ Production deployments must set these backend runtime values:
 - `RATE_LIMIT_PER_MINUTE=120` or the approved production limit
 - `MAX_REQUEST_BYTES=1048576` or the approved production request limit
 - `MAX_UPLOAD_BYTES=10485760` or the approved upload limit
+- `FILING_PROVIDER=mock` unless an approved ERI sandbox/live rollout is being tested
+- `FILING_PROVIDER_MODE=mock`, `sandbox`, or `live`
+- `ALLOW_LIVE_FILING=false` unless live filing has explicit written approval
 
 Do not deploy production with `AUTH_MODE=demo` unless a temporary controlled
 acceptance environment explicitly sets `ALLOW_DEMO_AUTH_IN_PRODUCTION=true`.
 Production startup rejects wildcard CORS, `DEBUG=true`, missing PostgreSQL URLs,
 missing GCS bucket names, missing JWT/Google provider configuration, and
 localhost public API URLs.
+
+## ERI Provider Configuration
+
+Phase 9 only prepares the ERI integration foundation. Mock filing remains the
+default and live filing is blocked unless all of these are true:
+
+- `FILING_PROVIDER=eri_live`
+- `FILING_PROVIDER_MODE=live`
+- `ALLOW_LIVE_FILING=true`
+- `ENVIRONMENT=production`
+- All required ERI configuration values are present
+
+Sandbox mode uses `FILING_PROVIDER=eri_sandbox` and
+`FILING_PROVIDER_MODE=sandbox`. It still requires provider configuration, but
+the Phase 9 adapter returns mocked sandbox responses when official ERI sandbox
+transport is unavailable. Tests must not call live government or ERI endpoints.
+
+Store provider secrets in Secret Manager, not in source files or `.env`
+commits:
+
+- `ERI_CLIENT_SECRET`
+- `ERI_PRIVATE_KEY_SECRET_NAME`
+- certificate/private-key material referenced by `ERI_CERT_PATH` or a future
+  provider-specific secret
+
+Non-secret provider values can be configured as environment variables:
+
+- `ERI_BASE_URL`
+- `ERI_TOKEN_URL`
+- `ERI_CLIENT_ID`
+- `ERI_CALLBACK_URL`
+- `ERI_TIMEOUT_SECONDS`
+- `ERI_RETRY_COUNT`
+- `ERI_STATUS_POLL_INTERVAL_SECONDS`
+
+Provider callback signatures are verified with configured provider secret
+material. Unsigned callbacks fail closed in production unless a controlled
+acceptance environment explicitly sets `ALLOW_UNSIGNED_PROVIDER_CALLBACKS=true`.
+Do not log raw provider payloads, tokens, PAN/Aadhaar, certificate contents, or
+internal storage paths. If raw provider payload retention is required later,
+store it only in encrypted, access-controlled storage with a dedicated retention
+policy.
 
 Initialize persistence before first traffic:
 

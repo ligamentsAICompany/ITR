@@ -342,6 +342,7 @@ export type ItrExport = {
   updated_at: string;
 };
 
+export type FilingProviderName = "mock" | "eri_sandbox" | "eri_live" | "sandbox" | "live";
 export type ProviderMode = "mock" | "sandbox" | "live";
 export type ConsentStatus = "not_requested" | "requested" | "granted" | "revoked" | "expired";
 export type ApprovalStatus = "not_required" | "pending" | "approved" | "rejected";
@@ -362,7 +363,7 @@ export type FilingReadinessResult = {
   blockers: string[];
   warnings: string[];
   required_actions: string[];
-  provider: ProviderMode;
+  provider: FilingProviderName;
   provider_mode: ProviderMode;
 };
 
@@ -399,7 +400,7 @@ export type FilingSubmission = {
   submission_id: string;
   package_id: string;
   export_id: string;
-  provider: string;
+  provider: FilingProviderName | string;
   provider_mode: ProviderMode;
   submission_status: SubmissionStatus;
   everification_status: EVerificationStatus;
@@ -420,4 +421,11 @@ export type Acknowledgement = {
   acknowledgement_date: string;
   artifact_id?: string | null;
   created_at: string;
+};
+
+export type ProviderError = {
+  code: string;
+  safe_message: string;
+  retryable: boolean;
+  severity: "info" | "warning" | "error" | "critical";
 };

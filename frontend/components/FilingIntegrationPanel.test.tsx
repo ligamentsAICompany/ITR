@@ -6,8 +6,11 @@ import { AcknowledgementPanel } from "./AcknowledgementPanel";
 import { EVerificationPanel } from "./EVerificationPanel";
 import { FilingApprovalPanel } from "./FilingApprovalPanel";
 import { FilingConsentPanel } from "./FilingConsentPanel";
+import { FilingProviderModeBadge } from "./FilingProviderModeBadge";
 import { FilingReadinessPanel } from "./FilingReadinessPanel";
 import { FilingSubmissionPanel } from "./FilingSubmissionPanel";
+import { ProviderErrorPanel } from "./ProviderErrorPanel";
+import { ProviderStatusPanel } from "./ProviderStatusPanel";
 import type {
   Acknowledgement,
   FilingApproval,
@@ -124,5 +127,49 @@ describe("filing integration UI", () => {
     assert.match(html, /MOCK-ACK-1234/i);
     assert.match(html, /Please sign in/i);
     assert.match(html, /do not have access/i);
+  });
+
+  it("renders provider diagnostics, live warning, missing config, retryable error, and capabilities", () => {
+    const sandboxReadiness: FilingReadinessResult = {
+      ready: false,
+      blockers: ["provider_not_configured"],
+      warnings: ["ERI sandbox configuration is missing."],
+      required_actions: ["Configure ERI sandbox credentials in Secret Manager."],
+      provider: "eri_sandbox",
+      provider_mode: "sandbox",
+    };
+    const html = renderToStaticMarkup(
+      <>
+        <FilingProviderModeBadge provider="eri_live" mode="live" liveAllowed={false} />
+        <ProviderStatusPanel
+          readiness={sandboxReadiness}
+          submission={{
+            ...submission,
+            provider: "eri_sandbox",
+            provider_mode: "sandbox",
+            last_checked_at: "2026-05-30T00:00:00Z",
+          }}
+          everificationSupported={false}
+          acknowledgementAvailable={false}
+        />
+        <ProviderErrorPanel
+          error={{
+            code: "RATE_LIMITED",
+            safe_message: "Provider rate limit reached. Please retry after the provider interval.",
+            retryable: true,
+            severity: "warning",
+          }}
+        />
+      </>,
+    );
+
+    assert.match(html, /Live filing is disabled unless explicitly enabled and approved\./);
+    assert.match(html, /live filing disabled/i);
+    assert.match(html, /provider configuration missing/i);
+    assert.match(html, /last status check/i);
+    assert.match(html, /retryable/i);
+    assert.match(html, /e-verification unsupported/i);
+    assert.match(html, /acknowledgement unavailable/i);
+    assert.doesNotMatch(html, /client_secret|access token|raw payload/i);
   });
 });

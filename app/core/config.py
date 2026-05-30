@@ -35,7 +35,14 @@ class Settings:
     eri_client_id: str | None
     eri_client_secret: str | None
     eri_base_url: str | None
+    eri_token_url: str | None
     eri_callback_url: str | None
+    eri_cert_path: str | None
+    eri_private_key_secret_name: str | None
+    eri_timeout_seconds: int
+    eri_retry_count: int
+    eri_status_poll_interval_seconds: int
+    allow_unsigned_provider_callbacks: bool
     mock_filing_outcome: str
 
     def __init__(self) -> None:
@@ -70,12 +77,25 @@ class Settings:
         )
         self.next_public_api_base_url = getenv("NEXT_PUBLIC_API_BASE_URL") or None
         self.filing_provider = getenv("FILING_PROVIDER", "mock").lower()
-        self.filing_provider_mode = getenv("FILING_PROVIDER_MODE", self.filing_provider).lower()
+        provider_default_mode = {"eri_sandbox": "sandbox", "eri_live": "live"}.get(self.filing_provider, self.filing_provider)
+        self.filing_provider_mode = getenv("FILING_PROVIDER_MODE", provider_default_mode).lower()
         self.allow_live_filing = getenv("ALLOW_LIVE_FILING", "false").lower() in {"1", "true", "yes", "on"}
         self.eri_client_id = getenv("ERI_CLIENT_ID") or None
         self.eri_client_secret = getenv("ERI_CLIENT_SECRET") or None
         self.eri_base_url = getenv("ERI_BASE_URL") or None
+        self.eri_token_url = getenv("ERI_TOKEN_URL") or None
         self.eri_callback_url = getenv("ERI_CALLBACK_URL") or None
+        self.eri_cert_path = getenv("ERI_CERT_PATH") or None
+        self.eri_private_key_secret_name = getenv("ERI_PRIVATE_KEY_SECRET_NAME") or None
+        self.eri_timeout_seconds = int(getenv("ERI_TIMEOUT_SECONDS", "10"))
+        self.eri_retry_count = int(getenv("ERI_RETRY_COUNT", "2"))
+        self.eri_status_poll_interval_seconds = int(getenv("ERI_STATUS_POLL_INTERVAL_SECONDS", "30"))
+        self.allow_unsigned_provider_callbacks = getenv("ALLOW_UNSIGNED_PROVIDER_CALLBACKS", "false").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         self.mock_filing_outcome = getenv("MOCK_FILING_OUTCOME", "success").lower()
 
     @property
@@ -92,8 +112,8 @@ class Settings:
             errors.append("PERSISTENCE_BACKEND must be memory, sqlite, or postgres")
         if self.storage_backend not in {"local", "gcs"}:
             errors.append("STORAGE_BACKEND must be local or gcs")
-        if self.filing_provider not in {"mock", "sandbox", "live"}:
-            errors.append("FILING_PROVIDER must be mock, sandbox, or live")
+        if self.filing_provider not in {"mock", "sandbox", "live", "eri_sandbox", "eri_live"}:
+            errors.append("FILING_PROVIDER must be mock, eri_sandbox, or eri_live")
         if self.filing_provider_mode not in {"mock", "sandbox", "live"}:
             errors.append("FILING_PROVIDER_MODE must be mock, sandbox, or live")
         if self.mock_filing_outcome not in {"success", "failure", "pending"}:
@@ -114,6 +134,12 @@ class Settings:
             errors.append("MAX_REQUEST_BYTES must be positive")
         if self.max_upload_bytes <= 0:
             errors.append("MAX_UPLOAD_BYTES must be positive")
+        if self.eri_timeout_seconds <= 0:
+            errors.append("ERI_TIMEOUT_SECONDS must be positive")
+        if self.eri_retry_count < 0:
+            errors.append("ERI_RETRY_COUNT cannot be negative")
+        if self.eri_status_poll_interval_seconds <= 0:
+            errors.append("ERI_STATUS_POLL_INTERVAL_SECONDS must be positive")
         if self.is_production:
             if self.debug:
                 errors.append("DEBUG=false is required in production")

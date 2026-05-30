@@ -1,5 +1,8 @@
 """API endpoints for deterministic ITR classification."""
 
+import hashlib
+import hmac
+import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
@@ -33,6 +36,8 @@ from app.models.filing_submission import (
     FilingSubmission,
     FilingSubmissionRequest,
 )
+from app.models.audit import AuditEvent
+from app.models.provider_integration import ProviderCallbackEvent
 from app.models.itr_export import (
     ItrExport,
     ItrExportExplainRequest,
@@ -66,6 +71,8 @@ from app.models.auth import SessionContext
 from app.services.audit_service import AuditService
 from app.services.authorization_service import AuthorizationService
 from app.repositories.filing_package_repository import FilingPackageRepository
+from app.repositories.audit_repository import AuditRepository
+from app.repositories.filing_workflow_repository import FilingSubmissionRepository
 from app.repositories.itr_export_repository import ItrExportRepository
 from app.repositories.schema_pack_repository import SchemaPackRepository
 from app.repositories.tax_computation_repository import TAX_COMPUTATION_CACHE, TaxComputationRepository
@@ -76,6 +83,7 @@ from app.services.explanation_service import explain_decision
 from app.services.filing_package_service import FilingPackageService
 from app.services.filing_readiness_service import FilingReadinessResult
 from app.services.filing_service import FilingService
+from app.services.eri_provider import normalize_provider_status
 from app.services.itr_export_service import ItrExportService
 from app.services.itr_service import get_missing_fields, run_itr_decision
 from app.services.normalization_service import normalize_raw_user_data
@@ -97,6 +105,8 @@ schema_pack_repository = SchemaPackRepository()
 itr_export_repository = ItrExportRepository()
 authorization_service = AuthorizationService()
 audit_service = AuditService()
+provider_callback_audit_repository = AuditRepository()
+provider_callback_submission_repository = FilingSubmissionRepository()
 
 
 def _storage_service() -> DocumentStorageService:
@@ -778,6 +788,72 @@ def _filing_error(exc: Exception) -> HTTPException:
     if isinstance(exc, PermissionError):
         return HTTPException(status_code=403, detail="Access denied")
     return HTTPException(status_code=400, detail=str(exc))
+
+
+def _verify_provider_callback_signature(*, body: bytes, signature: str | None) -> bool:
+    settings = get_settings()
+    secret = settings.eri_client_secret
+    if not secret:
+        return not settings.is_production or settings.allow_unsigned_provider_callbacks
+    if not signature:
+        return False
+    supplied = signature.removeprefix("sha256=").strip()
+    expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(supplied, expected)
+
+
+def _audit_provider_callback(event: ProviderCallbackEvent) -> None:
+    submission = provider_callback_submission_repository.get_by_provider_reference(event.provider_reference_id)
+    actor = submission.created_by or submission.owner_user_id if submission is not None else "00000000-0000-4000-8000-000000000000"
+    org = submission.organization_id if submission is not None else "00000000-0000-4000-8000-000000000000"
+    provider_callback_audit_repository.save(
+        AuditEvent(
+            event_type="provider_callback_received",
+            actor_user_id=actor or "00000000-0000-4000-8000-000000000000",
+            organization_id=org or "00000000-0000-4000-8000-000000000000",
+            resource_type="filing_submission",
+            resource_id=submission.submission_id if submission is not None else event.provider_reference_id,
+            request_id=event.callback_id,
+            metadata_summary={
+                "provider": event.provider,
+                "event_type": event.event_type,
+                "verified": event.verified,
+                "provider_status": event.provider_status,
+                "normalized_status": event.normalized_status,
+            },
+        )
+    )
+
+
+@router.post("/filing/provider-callbacks/{provider}", response_model=ProviderCallbackEvent)
+async def provider_callback(provider: str, request: Request) -> ProviderCallbackEvent:
+    body = await request.body()
+    verified = _verify_provider_callback_signature(body=body, signature=request.headers.get("X-Provider-Signature"))
+    settings = get_settings()
+    if settings.is_production and not verified and not settings.allow_unsigned_provider_callbacks:
+        raise HTTPException(status_code=401, detail="Provider callback signature verification failed")
+    try:
+        payload = json.loads(body.decode() or "{}")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Provider callback payload is invalid") from exc
+    provider_status = str(payload.get("provider_status") or payload.get("status") or "status_unknown")
+    event = ProviderCallbackEvent(
+        callback_id=str(payload.get("callback_id") or payload.get("event_id") or "00000000-0000-4000-8000-000000000000"),
+        provider=provider,
+        event_type=str(payload.get("event_type") or "status_update"),
+        provider_reference_id=str(payload.get("provider_reference_id") or ""),
+        verified=verified,
+        provider_status=provider_status,
+        normalized_status=normalize_provider_status(provider_status),
+    )
+    submission = provider_callback_submission_repository.get_by_provider_reference(event.provider_reference_id)
+    if submission is not None and event.normalized_status is not None:
+        submission.submission_status = event.normalized_status
+        submission.last_checked_at = event.received_at
+        submission.updated_at = event.received_at
+        provider_callback_submission_repository.save(submission)
+    _audit_provider_callback(event)
+    return event
 
 
 @router.post("/filing/consents/request", response_model=FilingConsent)

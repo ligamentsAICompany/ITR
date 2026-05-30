@@ -14,6 +14,8 @@ import { FilingConsentPanel } from "@/components/FilingConsentPanel";
 import { FilingPackagePanel } from "@/components/FilingPackagePanel";
 import { FilingReadinessPanel } from "@/components/FilingReadinessPanel";
 import { FilingSubmissionPanel } from "@/components/FilingSubmissionPanel";
+import { ProviderErrorPanel } from "@/components/ProviderErrorPanel";
+import { ProviderStatusPanel } from "@/components/ProviderStatusPanel";
 import { IntakeForm } from "@/components/IntakeForm";
 import { ItrExportPanel } from "@/components/ItrExportPanel";
 import { Navbar } from "@/components/Navbar";
@@ -785,6 +787,24 @@ export default function Home() {
             readiness={filingReadiness}
             loading={loading}
             onCheck={() => void handleCheckFilingReadiness()}
+          />
+          <ProviderStatusPanel
+            readiness={filingReadiness}
+            submission={filingSubmission}
+            everificationSupported={(filingSubmission?.provider_mode ?? filingReadiness?.provider_mode ?? "mock") !== "live"}
+            acknowledgementAvailable={Boolean(acknowledgement || filingSubmission?.acknowledgement_id)}
+          />
+          <ProviderErrorPanel
+            error={
+              filingWorkflowError
+                ? {
+                    code: "PROVIDER_ERROR",
+                    safe_message: filingWorkflowError,
+                    retryable: /retry|rate|timeout|try again/i.test(filingWorkflowError),
+                    severity: "warning",
+                  }
+                : null
+            }
           />
           <FilingConsentPanel
             consent={filingConsent}
