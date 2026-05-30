@@ -3,7 +3,7 @@
 from os import getenv
 from typing import Any
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
 
 from app.models.decision import (
     ClarificationRequest,
@@ -19,6 +19,12 @@ from app.models.document import (
     MergeExtractionResult,
     PublicDocumentMetadata,
 )
+from app.models.filing_package import (
+    FilingPackage,
+    FilingPackageExplanation,
+    FilingPackageExplainRequest,
+    FilingPackageGenerateRequest,
+)
 from app.models.tax_profile import CanonicalTaxProfile
 from app.models.tax_computation import (
     TaxComputeRequest,
@@ -32,12 +38,17 @@ from app.models.validation import (
     ValidationReport,
     ValidationRunRequest,
 )
+from app.agents.filing_agent import FilingAgent
 from app.agents.tax_computation_agent import TaxComputationAgent
 from app.agents.validation_agent import ValidationAgent
 from app.core.config import get_settings
+from app.repositories.filing_package_repository import FilingPackageRepository
+from app.repositories.tax_computation_repository import TAX_COMPUTATION_CACHE, TaxComputationRepository
+from app.repositories.validation_report_repository import VALIDATION_REPORT_CACHE, ValidationReportRepository
 from app.services.document_extraction_service import DocumentExtractionService
 from app.services.document_validation_service import DocumentValidationService
 from app.services.explanation_service import explain_decision
+from app.services.filing_package_service import FilingPackageService
 from app.services.itr_service import get_missing_fields, run_itr_decision
 from app.services.normalization_service import normalize_raw_user_data
 from app.services.profile_merge_service import ProfileMergeService
@@ -46,12 +57,20 @@ from app.services.storage_service import LocalStorageService
 from app.services.tax_computation_service import MissingTaxConfigError
 
 router = APIRouter()
-VALIDATION_REPORTS: dict[str, ValidationReport] = {}
-TAX_COMPUTATIONS: dict[str, TaxComputationResult] = {}
+# Non-production compatibility caches. Durable local persistence goes through repositories.
+VALIDATION_REPORTS = VALIDATION_REPORT_CACHE
+TAX_COMPUTATIONS = TAX_COMPUTATION_CACHE
+validation_report_repository = ValidationReportRepository()
+tax_computation_repository = TaxComputationRepository()
+filing_package_repository = FilingPackageRepository()
 
 
 def _storage_service() -> LocalStorageService:
     return LocalStorageService(getenv("DOCUMENT_STORAGE_DIR", get_settings().document_storage_dir))
+
+
+def _filing_package_service() -> FilingPackageService:
+    return FilingPackageService(repository=filing_package_repository)
 
 
 @router.post("/normalize", response_model=CanonicalTaxProfile)
@@ -119,13 +138,12 @@ def run_validation(request: ValidationRunRequest) -> ValidationReport:
         profile_id=request.profile_id,
         session_id=request.session_id,
     )
-    VALIDATION_REPORTS[report.validation_run_id] = report
-    return report
+    return validation_report_repository.save(report)
 
 
 @router.get("/validation/{validation_run_id}", response_model=ValidationReport)
 def get_validation_report(validation_run_id: str) -> ValidationReport:
-    report = VALIDATION_REPORTS.get(validation_run_id)
+    report = validation_report_repository.get(validation_run_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Validation report not found")
     return report
@@ -133,7 +151,7 @@ def get_validation_report(validation_run_id: str) -> ValidationReport:
 
 @router.post("/validation/explain", response_model=ValidationExplainResponse)
 def explain_validation(request: ValidationExplainRequest) -> ValidationExplainResponse:
-    report = VALIDATION_REPORTS.get(request.validation_run_id)
+    report = validation_report_repository.get(request.validation_run_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Validation report not found")
     return ValidationAgent().explain(report)
@@ -153,13 +171,12 @@ def compute_tax(request: TaxComputeRequest) -> TaxComputationResult:
             status_code=422,
             detail={"error": "missing_tax_config", "message": str(exc)},
         ) from exc
-    TAX_COMPUTATIONS[result.computation_id] = result
-    return result
+    return tax_computation_repository.save(result)
 
 
 @router.post("/tax/explain", response_model=TaxExplanationResponse)
 def explain_tax(request: TaxExplainRequest) -> TaxExplanationResponse:
-    result = TAX_COMPUTATIONS.get(request.computation_id)
+    result = tax_computation_repository.get(request.computation_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Tax computation not found")
     return TaxComputationAgent().explain(result)
@@ -167,10 +184,65 @@ def explain_tax(request: TaxExplainRequest) -> TaxExplanationResponse:
 
 @router.get("/tax/{computation_id}", response_model=TaxComputationResult)
 def get_tax_computation(computation_id: str) -> TaxComputationResult:
-    result = TAX_COMPUTATIONS.get(computation_id)
+    result = tax_computation_repository.get(computation_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Tax computation not found")
     return result
+
+
+@router.post("/filing-packages/generate", response_model=FilingPackage)
+def generate_filing_package(request: FilingPackageGenerateRequest) -> FilingPackage:
+    return FilingAgent(service=_filing_package_service()).generate_package(
+        profile=request.profile,
+        candidate_itr=request.candidate_itr,
+        validation_report=request.validation_report,
+        tax_computation_result=request.tax_computation_result,
+        documents=request.documents,
+    )
+
+
+@router.get("/filing-packages/{package_id}", response_model=FilingPackage)
+def get_filing_package(package_id: str) -> FilingPackage:
+    package = _filing_package_service().get(package_id)
+    if package is None:
+        raise HTTPException(status_code=404, detail="Filing package not found")
+    return package
+
+
+@router.get("/filing-packages/{package_id}/artifacts")
+def list_filing_package_artifacts(package_id: str) -> list[dict[str, Any]]:
+    package = _filing_package_service().get(package_id)
+    if package is None:
+        raise HTTPException(status_code=404, detail="Filing package not found")
+    return [artifact.model_dump(mode="json") for artifact in package.artifacts]
+
+
+@router.get("/filing-packages/{package_id}/artifacts/{artifact_id}")
+def download_filing_package_artifact(package_id: str, artifact_id: str) -> Response:
+    service = _filing_package_service()
+    package = service.get(package_id)
+    if package is None:
+        raise HTTPException(status_code=404, detail="Filing package not found")
+    artifact = next((item for item in package.artifacts if item.artifact_id == artifact_id), None)
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="Filing package artifact not found")
+    content = service.get_artifact_content(package_id, artifact_id)
+    if content is None:
+        raise HTTPException(status_code=404, detail="Filing package artifact not found")
+    return Response(
+        content=content,
+        media_type=artifact.mime_type,
+        headers={"Content-Disposition": f'attachment; filename="{artifact.filename}"'},
+    )
+
+
+@router.post("/filing-packages/explain", response_model=FilingPackageExplanation)
+def explain_filing_package(request: FilingPackageExplainRequest) -> FilingPackageExplanation:
+    service = _filing_package_service()
+    package = service.get(request.package_id)
+    if package is None:
+        raise HTTPException(status_code=404, detail="Filing package not found")
+    return FilingAgent(service=service).explain(package)
 
 
 @router.post("/itr-decision", response_model=ITRDecisionResponse)

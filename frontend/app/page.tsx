@@ -6,6 +6,7 @@ import { DecisionCard } from "@/components/DecisionCard";
 import { DocumentUploadCenter } from "@/components/DocumentUploadCenter";
 import { EscalationAlert } from "@/components/EscalationAlert";
 import { ExtractionReviewPanel } from "@/components/ExtractionReviewPanel";
+import { FilingPackagePanel } from "@/components/FilingPackagePanel";
 import { IntakeForm } from "@/components/IntakeForm";
 import { Navbar } from "@/components/Navbar";
 import { Spinner } from "@/components/Spinner";
@@ -14,6 +15,8 @@ import { ValidationReportPanel } from "@/components/ValidationReportPanel";
 import { WorkflowLog } from "@/components/WorkflowLog";
 import {
   computeTax,
+  downloadFilingPackageArtifact,
+  generateFilingPackage,
   getClarification,
   getDecision,
   getExplanation,
@@ -31,8 +34,11 @@ import type {
   CanonicalTaxProfile,
   ClarificationResponse,
   DocumentRecord,
+  DraftItrPayload,
   ExtractionResult,
   ExplanationResponse,
+  FilingPackage,
+  FilingPackageArtifact,
   ITRDecisionResponse,
   TaxComputationResult,
   ValidationReport,
@@ -112,6 +118,9 @@ export default function Home() {
   const [approvedFieldIds, setApprovedFieldIds] = useState<string[]>([]);
   const [validationReport, setValidationReport] = useState<ValidationReport | null>(null);
   const [taxComputation, setTaxComputation] = useState<TaxComputationResult | null>(null);
+  const [filingPackage, setFilingPackage] = useState<FilingPackage | null>(null);
+  const [draftPayload, setDraftPayload] = useState<DraftItrPayload | null>(null);
+  const [filingPackageError, setFilingPackageError] = useState<string | null>(null);
 
   const questions = useMemo(
     () => (clarification?.question ? [clarification.question] : []),
@@ -125,10 +134,17 @@ export default function Home() {
 
   function updateForm(field: keyof BasicFormState, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
+    clearFilingPackage();
   }
 
   function pushLog(message: string) {
     setLogs((current) => [...current, message]);
+  }
+
+  function clearFilingPackage() {
+    setFilingPackage(null);
+    setDraftPayload(null);
+    setFilingPackageError(null);
   }
 
   function handleExtraction(document: DocumentRecord, extractionResult: ExtractionResult) {
@@ -139,6 +155,7 @@ export default function Home() {
       ...current.filter((item) => item.document_id !== extractionResult.document_id),
       extractionResult,
     ]);
+    clearFilingPackage();
     pushLog(`extract: ${extractionResult.fields.length} candidate field(s) ready for review`);
   }
 
@@ -153,6 +170,7 @@ export default function Home() {
       const mergeResult = await mergeExtractionFields(form, reviewedExtraction ?? extraction, fieldIds);
       const nextForm = normalizeDocumentMerge(applyMergedPayloadToForm(form, mergeResult.merged_payload));
       setForm(nextForm);
+      clearFilingPackage();
       setApprovedFieldIds((current) => [...new Set([...current, ...mergeResult.applied_field_ids])]);
       setExtractions((current) => [
         ...current.filter((item) => item.document_id !== (reviewedExtraction ?? extraction).document_id),
@@ -175,6 +193,9 @@ export default function Home() {
     setDecision(null);
     setValidationReport(null);
     setTaxComputation(null);
+    setFilingPackage(null);
+    setDraftPayload(null);
+    setFilingPackageError(null);
     setMissingFields([]);
     setProfile(null);
     setExplanation(null);
@@ -267,6 +288,59 @@ export default function Home() {
       pushLog(`error: ${message}`);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleGenerateFilingPackage() {
+    if (!profile || !decision || !validationReport || !taxComputation) {
+      setFilingPackageError("Run ITR recommendation, validation, and tax computation before generating a package.");
+      return;
+    }
+
+    setLoading(true);
+    setFilingPackageError(null);
+    try {
+      pushLog("filing-package: POST /v1/filing-packages/generate");
+      const packageResult = await generateFilingPackage({
+        profile,
+        decision,
+        validationReport,
+        taxComputation,
+        documents,
+      });
+      setFilingPackage(packageResult);
+      const draftArtifact = packageResult.artifacts.find((artifact) => artifact.artifact_type === "draft_itr_payload");
+      if (draftArtifact) {
+        const blob = await downloadFilingPackageArtifact(packageResult.package_id, draftArtifact.artifact_id);
+        setDraftPayload(JSON.parse(await blob.text()) as DraftItrPayload);
+      }
+      pushLog(`filing-package: generated ${packageResult.artifacts.length} artifact(s)`);
+    } catch (caughtError) {
+      setFilingPackageError(
+        caughtError instanceof Error ? caughtError.message : "Could not generate the filing package.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDownloadArtifact(artifact: FilingPackageArtifact) {
+    if (!filingPackage) {
+      return;
+    }
+
+    try {
+      const blob = await downloadFilingPackageArtifact(filingPackage.package_id, artifact.artifact_id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = artifact.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (caughtError) {
+      setFilingPackageError(
+        caughtError instanceof Error ? caughtError.message : "Could not download the selected artifact.",
+      );
     }
   }
 
@@ -374,6 +448,15 @@ export default function Home() {
           <DecisionCard decision={decision} explanation={explanation} missingFields={missingFields} />
           <ValidationReportPanel report={validationReport} />
           <TaxComputationPanel result={taxComputation} validationReport={validationReport} />
+          <FilingPackagePanel
+            filingPackage={filingPackage}
+            draftPayload={draftPayload}
+            error={filingPackageError}
+            onGenerate={() => void handleGenerateFilingPackage()}
+            onDownloadArtifact={(artifact) => void handleDownloadArtifact(artifact)}
+            canGenerate={Boolean(profile && decision && validationReport && taxComputation)}
+            loading={loading}
+          />
           <EscalationAlert show={escalation} />
           <WorkflowLog logs={logs} />
 

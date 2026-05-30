@@ -228,3 +228,62 @@ export type TaxComputationResult = {
   warnings: TaxComputationWarning[];
   steps: TaxComputationStep[];
 };
+
+export type FilingPackageStatus =
+  | "draft"
+  | "needs_review"
+  | "ready_for_ca_review"
+  | "ready_for_export"
+  | "blocked";
+
+export type FilingPackageArtifactType =
+  | "filing_summary_json"
+  | "tax_computation_report"
+  | "validation_report_json"
+  | "draft_itr_payload"
+  | "package_manifest";
+
+export type FilingPackageWarning = {
+  warning_id: string;
+  severity: "critical" | "high" | "medium" | "low" | "info";
+  message: string;
+  source: string;
+  recommendation: string;
+};
+
+export type FilingPackageArtifact = {
+  artifact_id: string;
+  artifact_type: FilingPackageArtifactType;
+  filename: string;
+  mime_type: string;
+  size: number;
+  sha256: string;
+  created_at: string;
+};
+
+export type FilingPackage = {
+  package_id: string;
+  assessment_year: string;
+  previous_year?: string | null;
+  candidate_itr: string;
+  status: FilingPackageStatus;
+  readiness_score: number;
+  validation_run_id: string;
+  computation_id: string;
+  document_ids: string[];
+  warnings: FilingPackageWarning[];
+  artifacts: FilingPackageArtifact[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type FilingPackageExplanation = {
+  package_id: string;
+  explanation: string;
+  grounded_artifact_ids: string[];
+};
+
+export type DraftItrPayload = Record<string, unknown> & {
+  payload_type?: "draft_itr_payload";
+  schema_status?: "internal_draft_not_official";
+};

@@ -6,6 +6,7 @@ import type {
   DocumentType,
   ExtractionResult,
   ExplanationResponse,
+  FilingPackage,
   ITRDecisionResponse,
   MergeExtractionResult,
   TaxComputationResult,
@@ -239,4 +240,35 @@ export function runValidation({
     extractions,
     approved_field_ids: approvedFieldIds,
   });
+}
+
+export function generateFilingPackage({
+  profile,
+  decision,
+  validationReport,
+  taxComputation,
+  documents,
+}: {
+  profile: CanonicalTaxProfile;
+  decision: ITRDecisionResponse;
+  validationReport: ValidationReport;
+  taxComputation: TaxComputationResult;
+  documents: DocumentRecord[];
+}): Promise<FilingPackage> {
+  return postJson<FilingPackage>("/v1/filing-packages/generate", {
+    profile,
+    candidate_itr: decision,
+    validation_report: validationReport,
+    tax_computation_result: taxComputation,
+    documents,
+  });
+}
+
+export async function downloadFilingPackageArtifact(packageId: string, artifactId: string): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/v1/filing-packages/${packageId}/artifacts/${artifactId}`);
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(toFriendlyErrorMessage("/v1/filing-packages/artifacts", response.status, errorBody));
+  }
+  return response.blob();
 }
