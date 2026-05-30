@@ -1,6 +1,7 @@
 """Document intake models for upload, extraction, and reviewed merges."""
 
 from enum import StrEnum
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -28,6 +29,32 @@ class DocumentRecord(StrictDocumentModel):
     sha256: str
     storage_path: str
     status: Literal["uploaded", "validated", "extracted", "rejected"] = "uploaded"
+    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    def to_public_metadata(self) -> "PublicDocumentMetadata":
+        return PublicDocumentMetadata(
+            document_id=self.document_id,
+            document_type=self.document_type,
+            original_filename=self.original_filename,
+            safe_filename=self.safe_filename,
+            size=self.size_bytes,
+            mime_type=self.content_type,
+            sha256=self.sha256,
+            status=self.status,
+            uploaded_at=self.uploaded_at,
+        )
+
+
+class PublicDocumentMetadata(StrictDocumentModel):
+    document_id: str
+    document_type: DocumentType
+    original_filename: str
+    safe_filename: str
+    size: int = Field(ge=0)
+    mime_type: str
+    sha256: str
+    status: Literal["uploaded", "validated", "extracted", "rejected"] = "uploaded"
+    uploaded_at: datetime
 
 
 class ExtractionSource(StrictDocumentModel):

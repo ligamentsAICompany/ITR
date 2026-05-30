@@ -8,6 +8,7 @@ import type {
   ExplanationResponse,
   ITRDecisionResponse,
   MergeExtractionResult,
+  ValidationReport,
 } from "@/types/itr";
 import { normalizeAadhaar } from "./aadhaar";
 
@@ -199,5 +200,26 @@ export function getClarification(
   return postJson<ClarificationResponse>("/v1/clarify", {
     missing_fields: missingFields,
     context,
+  });
+}
+
+export function runValidation({
+  profile,
+  documents,
+  extractions,
+  approvedFieldIds,
+}: {
+  profile: CanonicalTaxProfile;
+  documents: DocumentRecord[];
+  extractions: ExtractionResult[];
+  approvedFieldIds: string[];
+}): Promise<ValidationReport> {
+  return postJson<ValidationReport>("/v1/validation/run", {
+    profile_id: "frontend-profile",
+    session_id: "frontend-session",
+    profile,
+    documents,
+    extractions,
+    approved_field_ids: approvedFieldIds,
   });
 }

@@ -77,11 +77,11 @@ export type DocumentRecord = {
   document_type: DocumentType;
   original_filename: string;
   safe_filename: string;
-  content_type: string;
-  size_bytes: number;
+  mime_type: string;
+  size: number;
   sha256: string;
-  storage_path: string;
   status: string;
+  uploaded_at: string;
 };
 
 export type ExtractedField = {
@@ -108,4 +108,49 @@ export type MergeExtractionResult = {
   merged_payload: Record<string, unknown>;
   applied_field_ids: string[];
   skipped_field_ids: string[];
+};
+
+export type ValidationSeverity = "critical" | "high" | "medium" | "low" | "info";
+export type ValidationStatus = "passed" | "warning" | "failed" | "needs_review";
+
+export type ValidationIssue = {
+  issue_id: string;
+  rule_id: string;
+  severity: ValidationSeverity;
+  status: ValidationStatus;
+  title: string;
+  message: string;
+  field_path: string;
+  expected_value: unknown;
+  actual_value: unknown;
+  source_documents: string[];
+  evidence_refs: string[];
+  recommendation: string;
+  blocks_filing_package: boolean;
+};
+
+export type ReconciliationConflict = {
+  field_path: string;
+  profile_value: unknown;
+  extracted_value: unknown;
+  source_documents: string[];
+  evidence_refs: string[];
+};
+
+export type ValidationReport = {
+  validation_run_id: string;
+  profile_id?: string | null;
+  session_id?: string | null;
+  created_at: string;
+  overall_status: ValidationStatus;
+  readiness_score: number;
+  issues: ValidationIssue[];
+  missing_fields: string[];
+  conflicts: ReconciliationConflict[];
+  warnings: string[];
+  evidence_summary: {
+    document_count: number;
+    approved_extracted_field_count: number;
+    document_types: string[];
+  };
 };

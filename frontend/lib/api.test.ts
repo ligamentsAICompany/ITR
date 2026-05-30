@@ -6,6 +6,7 @@ import {
   extractDocument,
   mergeExtractionFields,
   normalizeProfile,
+  runValidation,
   uploadDocument,
 } from "./api";
 import type { BasicFormState, ExtractionResult } from "../types/itr";
@@ -158,6 +159,50 @@ describe("document intake API helpers", () => {
 
     assert.deepEqual(calls, ["/v1/uploads/doc-1/extract", "/v1/intake/merge-extractions"]);
     assert.equal(nextForm.salaryIncome, "1200000");
+  });
+});
+
+describe("validation API helpers", () => {
+  afterEach(() => {
+    delete (globalThis as { fetch?: typeof fetch }).fetch;
+  });
+
+  it("runs validation without sending unapproved extracted values as authority", async () => {
+    let capturedPayload: Record<string, unknown> | null = null;
+    globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      capturedPayload = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(
+        JSON.stringify({
+          validation_run_id: "val-1",
+          profile_id: "profile-1",
+          session_id: "session-1",
+          created_at: "2026-05-30T00:00:00Z",
+          overall_status: "passed",
+          readiness_score: 100,
+          issues: [],
+          missing_fields: [],
+          conflicts: [],
+          warnings: [],
+          evidence_summary: { document_count: 0, approved_extracted_field_count: 0, document_types: [] },
+        }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+
+    const report = await runValidation({
+      profile: { user_identity: { pan: "ABCDE1234F" } },
+      documents: [],
+      extractions: [{ document_id: "doc-1", status: "completed", fields: [] }],
+      approvedFieldIds: ["field-1"],
+    });
+
+    assert.equal(report.validation_run_id, "val-1");
+    if (capturedPayload === null) {
+      throw new Error("runValidation did not call fetch");
+    }
+    const payload = capturedPayload as Record<string, unknown>;
+    assert.deepEqual(payload.approved_field_ids, ["field-1"]);
+    assert.ok(Object.hasOwn(payload, "extractions"));
   });
 });
 

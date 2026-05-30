@@ -9,6 +9,7 @@ import { ExtractionReviewPanel } from "@/components/ExtractionReviewPanel";
 import { IntakeForm } from "@/components/IntakeForm";
 import { Navbar } from "@/components/Navbar";
 import { Spinner } from "@/components/Spinner";
+import { ValidationReportPanel } from "@/components/ValidationReportPanel";
 import { WorkflowLog } from "@/components/WorkflowLog";
 import {
   getClarification,
@@ -18,6 +19,7 @@ import {
   applyMergedPayloadToForm,
   mergeExtractionFields,
   normalizeProfile,
+  runValidation,
 } from "@/lib/api";
 import { validateAadhaar } from "@/lib/aadhaar";
 import { maskSensitiveProfile } from "@/lib/security";
@@ -30,6 +32,7 @@ import type {
   ExtractionResult,
   ExplanationResponse,
   ITRDecisionResponse,
+  ValidationReport,
 } from "@/types/itr";
 
 const highRiskFields = ["foreign_assets", "business_profession", "capital_gains", "exemptions_flags"];
@@ -101,6 +104,10 @@ export default function Home() {
   const [unresolvedFields, setUnresolvedFields] = useState<string[]>([]);
   const [uploadedDocument, setUploadedDocument] = useState<DocumentRecord | null>(null);
   const [extraction, setExtraction] = useState<ExtractionResult | null>(null);
+  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [extractions, setExtractions] = useState<ExtractionResult[]>([]);
+  const [approvedFieldIds, setApprovedFieldIds] = useState<string[]>([]);
+  const [validationReport, setValidationReport] = useState<ValidationReport | null>(null);
 
   const questions = useMemo(
     () => (clarification?.question ? [clarification.question] : []),
@@ -123,6 +130,11 @@ export default function Home() {
   function handleExtraction(document: DocumentRecord, extractionResult: ExtractionResult) {
     setUploadedDocument(document);
     setExtraction(extractionResult);
+    setDocuments((current) => [...current.filter((item) => item.document_id !== document.document_id), document]);
+    setExtractions((current) => [
+      ...current.filter((item) => item.document_id !== extractionResult.document_id),
+      extractionResult,
+    ]);
     pushLog(`extract: ${extractionResult.fields.length} candidate field(s) ready for review`);
   }
 
@@ -137,6 +149,11 @@ export default function Home() {
       const mergeResult = await mergeExtractionFields(form, reviewedExtraction ?? extraction, fieldIds);
       const nextForm = normalizeDocumentMerge(applyMergedPayloadToForm(form, mergeResult.merged_payload));
       setForm(nextForm);
+      setApprovedFieldIds((current) => [...new Set([...current, ...mergeResult.applied_field_ids])]);
+      setExtractions((current) => [
+        ...current.filter((item) => item.document_id !== (reviewedExtraction ?? extraction).document_id),
+        reviewedExtraction ?? extraction,
+      ]);
       pushLog(`merge: accepted ${mergeResult.applied_field_ids.length} reviewed field(s)`);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Could not merge extracted fields.");
@@ -152,6 +169,7 @@ export default function Home() {
     setError(null);
     setEscalation(false);
     setDecision(null);
+    setValidationReport(null);
     setMissingFields([]);
     setProfile(null);
     setExplanation(null);
@@ -172,6 +190,15 @@ export default function Home() {
       pushLog("normalize: POST /v1/normalize");
       const normalized = await normalizeProfile(nextForm);
       setProfile(normalized);
+
+      pushLog("validation: POST /v1/validation/run");
+      const validationResult = await runValidation({
+        profile: normalized,
+        documents,
+        extractions,
+        approvedFieldIds,
+      });
+      setValidationReport(validationResult);
 
       pushLog("decision: POST /v1/itr-decision");
       const decisionResult = await getDecision(normalized);
@@ -332,6 +359,7 @@ export default function Home() {
           />
 
           <DecisionCard decision={decision} explanation={explanation} missingFields={missingFields} />
+          <ValidationReportPanel report={validationReport} />
           <EscalationAlert show={escalation} />
           <WorkflowLog logs={logs} />
 

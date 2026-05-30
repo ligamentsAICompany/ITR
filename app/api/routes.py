@@ -1,5 +1,6 @@
 """API endpoints for deterministic ITR classification."""
 
+from os import getenv
 from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -12,13 +13,20 @@ from app.models.decision import (
     MissingFieldsResponse,
 )
 from app.models.document import (
-    DocumentRecord,
     DocumentType,
     ExtractionResult,
     MergeExtractionRequest,
     MergeExtractionResult,
+    PublicDocumentMetadata,
 )
 from app.models.tax_profile import CanonicalTaxProfile
+from app.models.validation import (
+    ValidationExplainRequest,
+    ValidationExplainResponse,
+    ValidationReport,
+    ValidationRunRequest,
+)
+from app.agents.validation_agent import ValidationAgent
 from app.core.config import get_settings
 from app.services.document_extraction_service import DocumentExtractionService
 from app.services.document_validation_service import DocumentValidationService
@@ -30,10 +38,11 @@ from app.services.slm_service import get_default_slm_service
 from app.services.storage_service import LocalStorageService
 
 router = APIRouter()
+VALIDATION_REPORTS: dict[str, ValidationReport] = {}
 
 
 def _storage_service() -> LocalStorageService:
-    return LocalStorageService(get_settings().document_storage_dir)
+    return LocalStorageService(getenv("DOCUMENT_STORAGE_DIR", get_settings().document_storage_dir))
 
 
 @router.post("/normalize", response_model=CanonicalTaxProfile)
@@ -41,11 +50,11 @@ def normalize(raw_user_data: dict[str, Any]) -> CanonicalTaxProfile:
     return normalize_raw_user_data(raw_user_data)
 
 
-@router.post("/uploads", response_model=DocumentRecord)
+@router.post("/uploads", response_model=PublicDocumentMetadata)
 async def upload_document(
     document_type: DocumentType = Form(...),
     file: UploadFile = File(...),
-) -> DocumentRecord:
+) -> PublicDocumentMetadata:
     content = await file.read()
     try:
         DocumentValidationService(get_settings().max_upload_bytes).validate(
@@ -57,18 +66,19 @@ async def upload_document(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    return _storage_service().save(
+    record = _storage_service().save(
         content=content,
         original_filename=file.filename or "document",
         content_type=file.content_type or "application/octet-stream",
         document_type=document_type,
     )
+    return record.to_public_metadata()
 
 
-@router.get("/uploads/{document_id}", response_model=DocumentRecord)
-def get_upload(document_id: str) -> DocumentRecord:
+@router.get("/uploads/{document_id}", response_model=PublicDocumentMetadata)
+def get_upload(document_id: str) -> PublicDocumentMetadata:
     try:
-        return _storage_service().get(document_id)
+        return _storage_service().get(document_id).to_public_metadata()
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Document not found") from exc
 
@@ -88,6 +98,36 @@ def merge_extractions(request: MergeExtractionRequest) -> MergeExtractionResult:
         extraction_result=request.extraction_result,
         approved_field_ids=request.approved_field_ids,
     )
+
+
+@router.post("/validation/run", response_model=ValidationReport)
+def run_validation(request: ValidationRunRequest) -> ValidationReport:
+    report = ValidationAgent().run(
+        profile=request.profile,
+        documents=request.documents,
+        extractions=request.extractions,
+        approved_field_ids=request.approved_field_ids,
+        profile_id=request.profile_id,
+        session_id=request.session_id,
+    )
+    VALIDATION_REPORTS[report.validation_run_id] = report
+    return report
+
+
+@router.get("/validation/{validation_run_id}", response_model=ValidationReport)
+def get_validation_report(validation_run_id: str) -> ValidationReport:
+    report = VALIDATION_REPORTS.get(validation_run_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Validation report not found")
+    return report
+
+
+@router.post("/validation/explain", response_model=ValidationExplainResponse)
+def explain_validation(request: ValidationExplainRequest) -> ValidationExplainResponse:
+    report = VALIDATION_REPORTS.get(request.validation_run_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Validation report not found")
+    return ValidationAgent().explain(report)
 
 
 @router.post("/itr-decision", response_model=ITRDecisionResponse)

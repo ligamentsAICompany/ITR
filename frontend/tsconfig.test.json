@@ -8,5 +8,5 @@
     "outDir": ".test-build",
     "types": ["node"]
   },
-  "include": ["lib/**/*.ts", "types/**/*.ts"]
+  "include": ["lib/**/*.ts", "types/**/*.ts", "components/**/*.tsx"]
 }
