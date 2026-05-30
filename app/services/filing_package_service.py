@@ -44,12 +44,18 @@ class FilingPackageService:
         tax_computation_result: TaxComputationResult,
         documents: list[PublicDocumentMetadata],
         extracted_evidence_summary: dict[str, Any] | None = None,
+        owner_user_id: str | None = None,
+        organization_id: str | None = None,
+        created_by: str | None = None,
     ) -> FilingPackage:
         profile_copy = CanonicalTaxProfile.model_validate(deepcopy(profile))
         warnings = self._warnings(validation_report, tax_computation_result)
         status = deterministic_status(validation_report, tax_computation_result)
         readiness_score = deterministic_readiness_score(validation_report, tax_computation_result, status)
         package = FilingPackage(
+            owner_user_id=owner_user_id,
+            organization_id=organization_id,
+            created_by=created_by,
             assessment_year=profile_copy.assessment_year,
             previous_year=profile_copy.previous_year,
             candidate_itr=candidate_itr.candidate_itr,

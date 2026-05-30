@@ -81,6 +81,9 @@ class FilingPackageArtifact(StrictFilingPackageModel):
 
 class FilingPackage(StrictFilingPackageModel):
     package_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    owner_user_id: str | None = None
+    organization_id: str | None = None
+    created_by: str | None = None
     assessment_year: str
     previous_year: str | None = None
     candidate_itr: str

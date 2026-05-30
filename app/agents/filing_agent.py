@@ -23,14 +23,24 @@ class FilingAgent:
         validation_report: ValidationReport,
         tax_computation_result: TaxComputationResult,
         documents: list[PublicDocumentMetadata],
+        owner_user_id: str | None = None,
+        organization_id: str | None = None,
+        created_by: str | None = None,
     ) -> FilingPackage:
-        return self.service.generate(
-            profile=profile,
-            candidate_itr=candidate_itr,
-            validation_report=validation_report,
-            tax_computation_result=tax_computation_result,
-            documents=documents,
-        )
+        payload = {
+            "profile": profile,
+            "candidate_itr": candidate_itr,
+            "validation_report": validation_report,
+            "tax_computation_result": tax_computation_result,
+            "documents": documents,
+        }
+        if owner_user_id is not None or organization_id is not None or created_by is not None:
+            payload.update(
+                owner_user_id=owner_user_id,
+                organization_id=organization_id,
+                created_by=created_by,
+            )
+        return self.service.generate(**payload)
 
     def explain(self, package: FilingPackage) -> FilingPackageExplanation:
         return self.service.explain(package)

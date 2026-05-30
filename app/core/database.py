@@ -13,6 +13,7 @@ SQLITE_TABLES = {
     "tax_computations",
     "filing_packages",
     "filing_package_artifacts",
+    "audit_events",
 }
 
 
@@ -22,8 +23,13 @@ def persistence_backend() -> str:
         if settings.database_url.startswith("sqlite:///"):
             return "sqlite"
         if settings.database_url.startswith(("postgres://", "postgresql://")):
-            return "postgresql"
-    return settings.persistence_backend
+            return "postgres"
+    backend = settings.persistence_backend
+    if backend not in {"memory", "sqlite", "postgres"}:
+        raise ValueError("Invalid PERSISTENCE_BACKEND")
+    if backend == "postgres" and not settings.database_url:
+        raise ValueError("DATABASE_URL is required for postgres persistence")
+    return backend
 
 
 def sqlite_path() -> Path:
@@ -63,6 +69,11 @@ def ensure_sqlite_schema(connection: sqlite3.Connection) -> None:
 
 def save_json_record(table: str, record_id: str, payload: dict, created_at: str, updated_at: str) -> None:
     _validate_table(table)
+    backend = persistence_backend()
+    if backend == "memory":
+        return
+    if backend == "postgres":
+        raise NotImplementedError("PostgreSQL persistence requires migrations before production client use")
     with sqlite_connection() as connection:
         connection.execute(
             f"""
@@ -76,6 +87,11 @@ def save_json_record(table: str, record_id: str, payload: dict, created_at: str,
 
 def get_json_record(table: str, record_id: str) -> dict | None:
     _validate_table(table)
+    backend = persistence_backend()
+    if backend == "memory":
+        return None
+    if backend == "postgres":
+        raise NotImplementedError("PostgreSQL persistence requires migrations before production client use")
     with sqlite_connection() as connection:
         row = connection.execute(f"SELECT payload FROM {table} WHERE id = ?", (record_id,)).fetchone()
     if row is None:

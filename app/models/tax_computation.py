@@ -1,6 +1,7 @@
 """Strict public models for deterministic tax computation."""
 
 from decimal import Decimal
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
@@ -78,6 +79,11 @@ class TaxComputationWarning(StrictTaxComputationModel):
 
 class TaxComputationResult(DecimalModel):
     computation_id: str
+    owner_user_id: str | None = None
+    organization_id: str | None = None
+    created_by: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     assessment_year: str
     previous_year: str | None = None
     selected_regime: TaxRegime

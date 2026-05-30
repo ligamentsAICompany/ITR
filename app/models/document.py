@@ -28,8 +28,13 @@ class DocumentRecord(StrictDocumentModel):
     size_bytes: int = Field(ge=0)
     sha256: str
     storage_path: str
+    owner_user_id: str | None = None
+    organization_id: str | None = None
+    created_by: str | None = None
     status: Literal["uploaded", "validated", "extracted", "rejected"] = "uploaded"
     uploaded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     def to_public_metadata(self) -> "PublicDocumentMetadata":
         return PublicDocumentMetadata(
@@ -77,6 +82,11 @@ class ExtractionResult(StrictDocumentModel):
     status: Literal["completed", "rejected", "warning"]
     fields: list[ExtractedField] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    owner_user_id: str | None = None
+    organization_id: str | None = None
+    created_by: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class MergeExtractionRequest(StrictDocumentModel):

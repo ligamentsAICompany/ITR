@@ -51,7 +51,13 @@ class DocumentExtractionService:
             )
 
         self.storage.update(record.model_copy(update={"status": "extracted" if result.status == "completed" else "rejected"}))
-        return result
+        return result.model_copy(
+            update={
+                "owner_user_id": record.owner_user_id,
+                "organization_id": record.organization_id,
+                "created_by": record.created_by,
+            }
+        )
 
     def _read_csv(self, content: bytes) -> list[dict[str, object]]:
         import pandas as pd

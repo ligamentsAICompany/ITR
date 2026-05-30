@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { AgentPanel } from "@/components/AgentPanel";
 import { DecisionCard } from "@/components/DecisionCard";
+import { DemoAuthPanel } from "@/components/DemoAuthPanel";
 import { DocumentUploadCenter } from "@/components/DocumentUploadCenter";
 import { EscalationAlert } from "@/components/EscalationAlert";
 import { ExtractionReviewPanel } from "@/components/ExtractionReviewPanel";
@@ -398,6 +399,7 @@ export default function Home() {
         </section>
 
         <div className="space-y-6">
+          <DemoAuthPanel />
           <DocumentUploadCenter
             disabled={loading}
             onExtracted={handleExtraction}

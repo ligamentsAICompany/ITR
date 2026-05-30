@@ -80,7 +80,11 @@ class ValidationReport(StrictValidationModel):
     validation_run_id: str
     profile_id: str | None = None
     session_id: str | None = None
+    owner_user_id: str | None = None
+    organization_id: str | None = None
+    created_by: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     overall_status: ValidationStatus
     readiness_score: int = Field(ge=0, le=100)
     issues: list[ValidationIssue] = Field(default_factory=list)

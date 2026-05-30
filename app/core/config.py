@@ -15,6 +15,10 @@ class Settings:
     database_url: str | None
     persistence_backend: str
     persistence_storage_dir: str
+    demo_auth_enabled: bool
+    storage_backend: str
+    gcs_bucket_name: str | None
+    audit_strict: bool
     cors_allowed_origins: list[str]
 
     def __init__(self) -> None:
@@ -28,6 +32,10 @@ class Settings:
         self.database_url = getenv("DATABASE_URL") or None
         self.persistence_backend = getenv("PERSISTENCE_BACKEND", "sqlite").lower()
         self.persistence_storage_dir = getenv("PERSISTENCE_STORAGE_DIR", ".local_persistence")
+        self.demo_auth_enabled = getenv("DEMO_AUTH_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+        self.storage_backend = getenv("STORAGE_BACKEND", "local").lower()
+        self.gcs_bucket_name = getenv("GCS_BUCKET_NAME") or None
+        self.audit_strict = getenv("AUDIT_STRICT", "false").lower() in {"1", "true", "yes", "on"}
         self.cors_allowed_origins = _csv(
             getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
         )

@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 
 from app.models.document import DocumentRecord, DocumentType
+from app.services.auth_service import DEMO_ORGANIZATION_ID, DEMO_USER_ID
 
 
 class LocalStorageService:
@@ -20,6 +21,9 @@ class LocalStorageService:
         original_filename: str,
         content_type: str,
         document_type: DocumentType,
+        owner_user_id: str | None = None,
+        organization_id: str | None = None,
+        created_by: str | None = None,
     ) -> DocumentRecord:
         document_id = str(uuid.uuid4())
         safe_filename = _safe_filename(original_filename)
@@ -37,6 +41,9 @@ class LocalStorageService:
             size_bytes=len(content),
             sha256=hashlib.sha256(content).hexdigest(),
             storage_path=str(storage_path),
+            owner_user_id=owner_user_id or DEMO_USER_ID,
+            organization_id=organization_id or DEMO_ORGANIZATION_ID,
+            created_by=created_by or owner_user_id or DEMO_USER_ID,
         )
         (document_dir / "metadata.json").write_text(record.model_dump_json(indent=2), encoding="utf-8")
         return record

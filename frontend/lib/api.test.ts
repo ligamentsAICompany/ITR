@@ -164,6 +164,31 @@ describe("document intake API helpers", () => {
     assert.ok(calls[1].endsWith("/v1/intake/merge-extractions"));
     assert.equal(nextForm.salaryIncome, "1200000");
   });
+
+  it("sends demo auth headers with upload, extract, and merge requests", async () => {
+    const headersSeen: Headers[] = [];
+    globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      headersSeen.push(new Headers(init?.headers));
+      return new Response(
+        JSON.stringify(
+          String(_input).endsWith("/extract")
+            ? { document_id: "doc-1", status: "completed", fields: [] }
+            : String(_input).endsWith("/v1/uploads")
+              ? { document_id: "doc-1" }
+              : { merged_payload: {}, applied_field_ids: [], skipped_field_ids: [] },
+        ),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+
+    await uploadDocument(new File(["Gross Salary\n1200000"], "form16.csv", { type: "text/csv" }), "form16");
+    await extractDocument("doc-1");
+    await mergeExtractionFields(baseForm, { document_id: "doc-1", status: "completed", fields: [] }, []);
+
+    assert.equal(headersSeen[0].get("X-Demo-User-Role"), "taxpayer");
+    assert.equal(headersSeen[1].get("X-Demo-User-Role"), "taxpayer");
+    assert.equal(headersSeen[2].get("X-Demo-User-Role"), "taxpayer");
+  });
 });
 
 describe("validation API helpers", () => {
@@ -269,6 +294,19 @@ describe("filing package API helpers", () => {
     assert.equal(calls.length, 1);
     assert.ok(calls[0].endsWith("/v1/filing-packages/pkg-1/artifacts/art-1"));
     assert.match(await blob.text(), /draft_itr_payload/);
+  });
+
+  it("returns user-friendly authentication and forbidden messages", async () => {
+    globalThis.fetch = (async () => new Response(JSON.stringify({ detail: "Access denied" }), { status: 403 })) as typeof fetch;
+
+    await assert.rejects(
+      () => downloadFilingPackageArtifact("pkg-1", "art-1"),
+      /You do not have access to this record/,
+    );
+
+    globalThis.fetch = (async () => new Response(JSON.stringify({ detail: "Authentication required" }), { status: 401 })) as typeof fetch;
+
+    await assert.rejects(() => downloadFilingPackageArtifact("pkg-1", "art-1"), /Please sign in/);
   });
 });
 

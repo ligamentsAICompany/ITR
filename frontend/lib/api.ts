@@ -13,6 +13,7 @@ import type {
   ValidationReport,
 } from "@/types/itr";
 import { normalizeAadhaar } from "./aadhaar";
+import { demoAuthHeaders } from "./auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
@@ -27,6 +28,7 @@ async function postJson<TResponse>(path: string, payload: unknown): Promise<TRes
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...demoAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -108,6 +110,7 @@ export async function uploadDocument(file: File, documentType: DocumentType): Pr
 
   const response = await fetch(`${API_BASE_URL}/v1/uploads`, {
     method: "POST",
+    headers: demoAuthHeaders(),
     body: formData,
   });
 
@@ -164,6 +167,12 @@ function toFriendlyErrorMessage(path: string, status: number, rawBody: string): 
   }
   if (body?.error === "malformed_json") {
     return "The request could not be read. Please refresh and try again.";
+  }
+  if (status === 401) {
+    return "Please sign in before continuing.";
+  }
+  if (status === 403) {
+    return "You do not have access to this record. Switch to the correct demo user or organization.";
   }
   if (status === 429) {
     return "Too many requests. Please wait a minute and try again.";
@@ -265,7 +274,9 @@ export function generateFilingPackage({
 }
 
 export async function downloadFilingPackageArtifact(packageId: string, artifactId: string): Promise<Blob> {
-  const response = await fetch(`${API_BASE_URL}/v1/filing-packages/${packageId}/artifacts/${artifactId}`);
+  const response = await fetch(`${API_BASE_URL}/v1/filing-packages/${packageId}/artifacts/${artifactId}`, {
+    headers: demoAuthHeaders(),
+  });
   if (!response.ok) {
     const errorBody = await response.text();
     throw new Error(toFriendlyErrorMessage("/v1/filing-packages/artifacts", response.status, errorBody));
