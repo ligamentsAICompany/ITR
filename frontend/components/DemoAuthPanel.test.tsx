@@ -13,4 +13,30 @@ describe("demo auth panel", () => {
     assert.match(markup, /taxpayer/);
     assert.match(markup, /Org:/);
   });
+
+  it("hides demo identity controls in production mode", () => {
+    const previousAuthMode = process.env.NEXT_PUBLIC_AUTH_MODE;
+    const previousDemoFlag = process.env.NEXT_PUBLIC_DEMO_AUTH_ENABLED;
+    process.env.NEXT_PUBLIC_AUTH_MODE = "jwt";
+    delete process.env.NEXT_PUBLIC_DEMO_AUTH_ENABLED;
+
+    try {
+      const markup = renderToStaticMarkup(<DemoAuthPanel />);
+
+      assert.match(markup, /Production authentication is required/);
+      assert.doesNotMatch(markup, /<select/);
+      assert.doesNotMatch(markup, /Demo user/);
+    } finally {
+      if (previousAuthMode === undefined) {
+        delete process.env.NEXT_PUBLIC_AUTH_MODE;
+      } else {
+        process.env.NEXT_PUBLIC_AUTH_MODE = previousAuthMode;
+      }
+      if (previousDemoFlag === undefined) {
+        delete process.env.NEXT_PUBLIC_DEMO_AUTH_ENABLED;
+      } else {
+        process.env.NEXT_PUBLIC_DEMO_AUTH_ENABLED = previousDemoFlag;
+      }
+    }
+  });
 });

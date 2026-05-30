@@ -20,6 +20,7 @@ from app.core.request_validation import request_validation_middleware
 
 configure_logging()
 settings = get_settings()
+settings.validate_startup()
 
 app = FastAPI(
     title="Deterministic ITR Classification API",
@@ -46,9 +47,21 @@ app.include_router(router, prefix="/v1")
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return _health_payload(api_version="v1")
 
 
 @app.get("/v1/health")
 def versioned_health() -> dict[str, str]:
-    return {"status": "ok", "api_version": "v1", "environment": settings.environment}
+    return _health_payload(api_version="v1")
+
+
+def _health_payload(*, api_version: str) -> dict[str, str]:
+    current = get_settings()
+    return {
+        "status": "ok",
+        "api_version": api_version,
+        "environment": current.environment,
+        "persistence_backend": current.persistence_backend,
+        "storage_backend": current.storage_backend,
+        "auth_mode": current.auth_mode,
+    }

@@ -37,6 +37,9 @@ export const DEMO_USERS: DemoAuthContext[] = [
 const STORAGE_KEY = "itr-demo-auth-context";
 
 export function isDemoAuthEnabled(): boolean {
+  if (process.env.NEXT_PUBLIC_AUTH_MODE && process.env.NEXT_PUBLIC_AUTH_MODE !== "demo") {
+    return false;
+  }
   return process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_DEMO_AUTH_ENABLED === "true";
 }
 

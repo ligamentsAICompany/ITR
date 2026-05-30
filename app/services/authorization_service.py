@@ -8,6 +8,7 @@ from app.models.auth import AccessDecision, SessionContext, UserRole
 class OwnedResource(Protocol):
     owner_user_id: str | None
     organization_id: str | None
+    created_by: str | None
 
 
 class AuthorizationService:
@@ -35,7 +36,9 @@ class AuthorizationService:
         if resource.organization_id != session.organization_id:
             return AccessDecision(allowed=False, reason="cross_organization")
         if session.role == UserRole.SERVICE:
-            return AccessDecision(allowed=True, reason="service_internal")
+            if getattr(resource, "created_by", None) == session.user_id:
+                return AccessDecision(allowed=True, reason="service_internal")
+            return AccessDecision(allowed=False, reason="service_not_authorized")
         if session.role in {UserRole.REVIEWER, UserRole.ADMIN}:
             return AccessDecision(allowed=True, reason="organization_scoped")
         if session.role == UserRole.TAXPAYER and resource.owner_user_id == session.user_id:

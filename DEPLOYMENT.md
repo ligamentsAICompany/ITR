@@ -46,15 +46,39 @@ Production deployments must set these backend runtime values:
 
 - `ENVIRONMENT=production`
 - `DEBUG=false`
+- `AUTH_MODE=jwt` for a production JWT/OIDC provider, or `AUTH_MODE=google` for Google Identity once configured
+- `JWT_ISSUER`, `JWT_AUDIENCE`, and either `JWT_JWKS_URL` or `JWT_SECRET` when `AUTH_MODE=jwt`
+- `PERSISTENCE_BACKEND=postgres`
+- `DATABASE_URL` from Secret Manager, for PostgreSQL or Cloud SQL
+- `STORAGE_BACKEND=gcs`
+- `GCS_BUCKET_NAME=<private-bucket>`
 - `CORS_ALLOWED_ORIGINS=https://<frontend-origin>`
 - `API_BASE_URL=https://<backend-origin>` when backend-generated links need an external base URL
 - `RATE_LIMIT_PER_MINUTE=120` or the approved production limit
 - `MAX_REQUEST_BYTES=1048576` or the approved production request limit
+- `MAX_UPLOAD_BYTES=10485760` or the approved upload limit
+
+Do not deploy production with `AUTH_MODE=demo` unless a temporary controlled
+acceptance environment explicitly sets `ALLOW_DEMO_AUTH_IN_PRODUCTION=true`.
+Production startup rejects wildcard CORS, `DEBUG=true`, missing PostgreSQL URLs,
+missing GCS bucket names, missing JWT/Google provider configuration, and
+localhost public API URLs.
+
+Initialize persistence before first traffic:
+
+```bash
+python -m app.db.init_db
+```
+
+For Cloud SQL PostgreSQL, run the command from the deployed image with the same
+`DATABASE_URL` secret and network access that the service uses.
 
 Production frontend builds must set:
 
 - `NEXT_PUBLIC_API_BASE_URL=` for full-stack/same-origin deployments so the browser calls `/v1/*`
 - `NEXT_PUBLIC_API_BASE_URL=https://<backend-origin>` for split frontend/backend deployments
+- `NEXT_PUBLIC_AUTH_MODE=jwt` or `google` in production so demo controls are not rendered
+- `NEXT_PUBLIC_DEMO_AUTH_ENABLED=false` in production
 - `BACKEND_INTERNAL_URL=http://127.0.0.1:8000` for full-stack single-container deployments
 - `BACKEND_INTERNAL_URL=https://<backend-origin>` for split frontend/backend deployments
 
@@ -97,7 +121,9 @@ gcloud run deploy itr-platform \
   --region "$REGION" \
   --image "gcr.io/$PROJECT_ID/itr-platform:$TAG" \
   --allow-unauthenticated \
-  --set-env-vars "ENVIRONMENT=production,DEBUG=false,API_BASE_URL=$FRONTEND_ORIGIN,CORS_ALLOWED_ORIGINS=$FRONTEND_ORIGIN,RATE_LIMIT_PER_MINUTE=120,MAX_REQUEST_BYTES=1048576"
+  --service-account "itr-runtime@$PROJECT_ID.iam.gserviceaccount.com" \
+  --set-env-vars "ENVIRONMENT=production,DEBUG=false,AUTH_MODE=jwt,API_BASE_URL=$FRONTEND_ORIGIN,CORS_ALLOWED_ORIGINS=$FRONTEND_ORIGIN,RATE_LIMIT_PER_MINUTE=120,MAX_REQUEST_BYTES=1048576,MAX_UPLOAD_BYTES=10485760,PERSISTENCE_BACKEND=postgres,STORAGE_BACKEND=gcs,GCS_BUCKET_NAME=$GCS_BUCKET_NAME,JWT_ISSUER=$JWT_ISSUER,JWT_AUDIENCE=$JWT_AUDIENCE,NEXT_PUBLIC_AUTH_MODE=jwt,NEXT_PUBLIC_DEMO_AUTH_ENABLED=false" \
+  --set-secrets "DATABASE_URL=itr-database-url:latest,JWT_JWKS_URL=itr-jwks-url:latest"
 ```
 
 Split backend/frontend Cloud Run services:
@@ -110,10 +136,13 @@ gcloud run deploy itr-backend \
   --region "$REGION" \
   --image "gcr.io/$PROJECT_ID/itr-backend:$TAG" \
   --allow-unauthenticated \
-  --set-env-vars "ENVIRONMENT=production,DEBUG=false,API_BASE_URL=$BACKEND_ORIGIN,CORS_ALLOWED_ORIGINS=$FRONTEND_ORIGIN,RATE_LIMIT_PER_MINUTE=120,MAX_REQUEST_BYTES=1048576"
+  --service-account "itr-runtime@$PROJECT_ID.iam.gserviceaccount.com" \
+  --set-env-vars "ENVIRONMENT=production,DEBUG=false,AUTH_MODE=jwt,API_BASE_URL=$BACKEND_ORIGIN,CORS_ALLOWED_ORIGINS=$FRONTEND_ORIGIN,RATE_LIMIT_PER_MINUTE=120,MAX_REQUEST_BYTES=1048576,MAX_UPLOAD_BYTES=10485760,PERSISTENCE_BACKEND=postgres,STORAGE_BACKEND=gcs,GCS_BUCKET_NAME=$GCS_BUCKET_NAME,JWT_ISSUER=$JWT_ISSUER,JWT_AUDIENCE=$JWT_AUDIENCE" \
+  --set-secrets "DATABASE_URL=itr-database-url:latest,JWT_JWKS_URL=itr-jwks-url:latest"
 
 docker build -f frontend/Dockerfile \
   --build-arg "NEXT_PUBLIC_API_BASE_URL=$BACKEND_ORIGIN" \
+  --build-arg "NEXT_PUBLIC_AUTH_MODE=jwt" \
   --build-arg "BACKEND_INTERNAL_URL=$BACKEND_ORIGIN" \
   -t "gcr.io/$PROJECT_ID/itr-frontend:$TAG" \
   frontend
@@ -123,18 +152,33 @@ gcloud run deploy itr-frontend \
   --region "$REGION" \
   --image "gcr.io/$PROJECT_ID/itr-frontend:$TAG" \
   --allow-unauthenticated \
-  --set-env-vars "NEXT_PUBLIC_API_BASE_URL=$BACKEND_ORIGIN,BACKEND_INTERNAL_URL=$BACKEND_ORIGIN"
+  --set-env-vars "NEXT_PUBLIC_API_BASE_URL=$BACKEND_ORIGIN,NEXT_PUBLIC_AUTH_MODE=jwt,NEXT_PUBLIC_DEMO_AUTH_ENABLED=false,BACKEND_INTERNAL_URL=$BACKEND_ORIGIN"
 ```
+
+Required Google Cloud IAM:
+
+- Runtime service account: `roles/cloudsql.client` for Cloud SQL PostgreSQL.
+- Runtime service account: `roles/storage.objectAdmin` scoped to the private GCS bucket, or tighter custom permissions for object create/read/delete.
+- Deployer: Artifact Registry writer and Cloud Run admin/developer permissions.
+- Secret access: grant the runtime service account `roles/secretmanager.secretAccessor` only for the database/JWT secrets it needs.
+
+Production does not require a `.env` file. Configure non-secret values directly
+on Cloud Run and keep `DATABASE_URL`, JWT private signing secrets, and external
+provider secret URLs in Secret Manager.
 
 After deployment, verify:
 
 ```bash
 curl -fsS "$BACKEND_ORIGIN/v1/health"
+curl -fsS -X POST "$BACKEND_ORIGIN/v1/uploads" -o /dev/null -w "%{http_code}\n"
 ```
 
-The response must include `"environment":"production"`. In the browser, hard
-refresh the frontend and verify invalid Aadhaar is blocked before any `/v1/*`
-request, valid Aadhaar submits, and blank Aadhaar submits.
+The health response must include safe fields only: `status`, `api_version`,
+`environment`, `persistence_backend`, `storage_backend`, and `auth_mode`.
+Unauthenticated protected API calls must return `401`. In the browser, hard
+refresh the frontend and verify demo identity controls are absent, invalid
+Aadhaar is blocked before any `/v1/*` request, valid Aadhaar submits with real
+auth, blank Aadhaar submits, and cross-user artifact access returns `403`.
 
 ## HTTPS
 

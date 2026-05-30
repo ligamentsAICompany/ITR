@@ -1,6 +1,5 @@
 """API endpoints for deterministic ITR classification."""
 
-from os import getenv
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
@@ -57,7 +56,7 @@ from app.services.itr_service import get_missing_fields, run_itr_decision
 from app.services.normalization_service import normalize_raw_user_data
 from app.services.profile_merge_service import ProfileMergeService
 from app.services.slm_service import get_default_slm_service
-from app.services.storage_service import LocalStorageService
+from app.services.storage_service import DocumentStorageService, get_document_storage_service
 from app.services.tax_computation_service import MissingTaxConfigError
 
 router = APIRouter()
@@ -71,13 +70,8 @@ authorization_service = AuthorizationService()
 audit_service = AuditService()
 
 
-def _storage_service() -> LocalStorageService:
-    settings = get_settings()
-    if settings.storage_backend == "gcs":
-        raise NotImplementedError("GCS document storage requires production implementation before client use")
-    if settings.storage_backend != "local":
-        raise ValueError("Invalid STORAGE_BACKEND")
-    return LocalStorageService(getenv("DOCUMENT_STORAGE_DIR", settings.document_storage_dir))
+def _storage_service() -> DocumentStorageService:
+    return get_document_storage_service()
 
 
 def _filing_package_service() -> FilingPackageService:
@@ -136,7 +130,7 @@ async def upload_document(
             organization_id=session.organization_id,
             created_by=session.user_id,
         )
-    except (ValueError, NotImplementedError) as exc:
+    except (ValueError, RuntimeError) as exc:
         raise _configuration_error(exc) from exc
     audit_service.record(
         event_type="document_uploaded",
