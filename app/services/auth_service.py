@@ -24,8 +24,7 @@ class AuthService:
         organization_id = request.headers.get("X-Demo-Organization-Id")
 
         if settings.environment == "production" and not settings.demo_auth_enabled:
-            if not (user_id and role and organization_id):
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
         if not (user_id and role and organization_id):
             if settings.environment == "production" and settings.demo_auth_enabled:

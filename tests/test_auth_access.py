@@ -39,6 +39,23 @@ def test_production_missing_auth_is_rejected(monkeypatch):
     assert response.status_code == 401
 
 
+def test_production_demo_headers_are_rejected_when_demo_auth_disabled(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("DEMO_AUTH_ENABLED", raising=False)
+    get_settings.cache_clear()
+    try:
+        response = client.post(
+            "/v1/uploads",
+            data={"document_type": "form16"},
+            files={"file": ("form16.csv", b"Gross Salary\n1200000\n", "text/csv")},
+            headers=auth(USER_A, "taxpayer", ORG_A),
+        )
+    finally:
+        get_settings.cache_clear()
+
+    assert response.status_code == 401
+
+
 def test_invalid_demo_role_is_rejected():
     response = client.post(
         "/v1/uploads",
