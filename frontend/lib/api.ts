@@ -8,6 +8,7 @@ import type {
   ExplanationResponse,
   ITRDecisionResponse,
   MergeExtractionResult,
+  TaxComputationResult,
   ValidationReport,
 } from "@/types/itr";
 import { normalizeAadhaar } from "./aadhaar";
@@ -191,6 +192,22 @@ export function getMissingFields(profile: CanonicalTaxProfile): Promise<{ missin
 
 export function getExplanation(decision: ITRDecisionResponse): Promise<ExplanationResponse> {
   return postJson<ExplanationResponse>("/v1/explain", decision);
+}
+
+export function computeTax({
+  profile,
+  decision,
+  validationReport,
+}: {
+  profile: CanonicalTaxProfile;
+  decision: ITRDecisionResponse;
+  validationReport: ValidationReport | null;
+}): Promise<TaxComputationResult> {
+  return postJson<TaxComputationResult>("/v1/tax/compute", {
+    profile,
+    candidate_itr: decision,
+    validation_report: validationReport,
+  });
 }
 
 export function getClarification(

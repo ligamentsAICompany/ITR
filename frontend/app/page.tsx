@@ -9,9 +9,11 @@ import { ExtractionReviewPanel } from "@/components/ExtractionReviewPanel";
 import { IntakeForm } from "@/components/IntakeForm";
 import { Navbar } from "@/components/Navbar";
 import { Spinner } from "@/components/Spinner";
+import { TaxComputationPanel } from "@/components/TaxComputationPanel";
 import { ValidationReportPanel } from "@/components/ValidationReportPanel";
 import { WorkflowLog } from "@/components/WorkflowLog";
 import {
+  computeTax,
   getClarification,
   getDecision,
   getExplanation,
@@ -32,6 +34,7 @@ import type {
   ExtractionResult,
   ExplanationResponse,
   ITRDecisionResponse,
+  TaxComputationResult,
   ValidationReport,
 } from "@/types/itr";
 
@@ -108,6 +111,7 @@ export default function Home() {
   const [extractions, setExtractions] = useState<ExtractionResult[]>([]);
   const [approvedFieldIds, setApprovedFieldIds] = useState<string[]>([]);
   const [validationReport, setValidationReport] = useState<ValidationReport | null>(null);
+  const [taxComputation, setTaxComputation] = useState<TaxComputationResult | null>(null);
 
   const questions = useMemo(
     () => (clarification?.question ? [clarification.question] : []),
@@ -170,6 +174,7 @@ export default function Home() {
     setEscalation(false);
     setDecision(null);
     setValidationReport(null);
+    setTaxComputation(null);
     setMissingFields([]);
     setProfile(null);
     setExplanation(null);
@@ -240,6 +245,14 @@ export default function Home() {
       pushLog("explain: POST /v1/explain");
       const explanationResult = await getExplanation(decisionResult);
       setExplanation(explanationResult);
+
+      pushLog("tax: POST /v1/tax/compute");
+      const taxResult = await computeTax({
+        profile: normalized,
+        decision: decisionResult,
+        validationReport: validationResult,
+      });
+      setTaxComputation(taxResult);
 
       if (
         decisionResult.confidence === "low" ||
@@ -360,6 +373,7 @@ export default function Home() {
 
           <DecisionCard decision={decision} explanation={explanation} missingFields={missingFields} />
           <ValidationReportPanel report={validationReport} />
+          <TaxComputationPanel result={taxComputation} validationReport={validationReport} />
           <EscalationAlert show={escalation} />
           <WorkflowLog logs={logs} />
 

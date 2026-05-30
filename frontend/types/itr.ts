@@ -155,3 +155,76 @@ export type ValidationReport = {
     document_types: string[];
   };
 };
+
+export type TaxRegime = "old" | "new";
+
+export type IncomeBreakdown = {
+  salary_income: number;
+  standard_deduction: number;
+  house_property_income: number;
+  business_profession_income: number;
+  capital_gains_income: number;
+  capital_gains_subtypes: Record<string, number>;
+  other_sources_income: number;
+  gross_total_income: number;
+};
+
+export type AppliedDeduction = {
+  section_code: string;
+  claimed_amount: number;
+  allowed_amount: number;
+  limit: number;
+  notes: string;
+};
+
+export type DeductionBreakdown = {
+  claimed_total: number;
+  allowed_total: number;
+  disallowed_total: number;
+  applied: AppliedDeduction[];
+};
+
+export type TaxCreditBreakdown = {
+  tds_salary: number;
+  tds_other: number;
+  tcs: number;
+  advance_tax: number;
+  self_assessment_tax: number;
+  total_credits: number;
+};
+
+export type TaxComputationWarning = {
+  code: string;
+  message: string;
+};
+
+export type TaxComputationStep = {
+  step_key: string;
+  label: string;
+  amount: number;
+  formula: string;
+};
+
+export type TaxComputationResult = {
+  computation_id: string;
+  assessment_year: string;
+  previous_year?: string | null;
+  selected_regime: TaxRegime;
+  regime_label: string;
+  default_regime: TaxRegime;
+  candidate_itr: string;
+  is_preview: boolean;
+  income: IncomeBreakdown;
+  deductions: DeductionBreakdown;
+  taxable_income: number;
+  tax_before_rebate: number;
+  rebate: number;
+  surcharge: number;
+  cess: number;
+  total_tax_liability: number;
+  credits: TaxCreditBreakdown;
+  refund_due: number;
+  tax_payable: number;
+  warnings: TaxComputationWarning[];
+  steps: TaxComputationStep[];
+};

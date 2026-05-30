@@ -20,12 +20,19 @@ from app.models.document import (
     PublicDocumentMetadata,
 )
 from app.models.tax_profile import CanonicalTaxProfile
+from app.models.tax_computation import (
+    TaxComputeRequest,
+    TaxComputationResult,
+    TaxExplainRequest,
+    TaxExplanationResponse,
+)
 from app.models.validation import (
     ValidationExplainRequest,
     ValidationExplainResponse,
     ValidationReport,
     ValidationRunRequest,
 )
+from app.agents.tax_computation_agent import TaxComputationAgent
 from app.agents.validation_agent import ValidationAgent
 from app.core.config import get_settings
 from app.services.document_extraction_service import DocumentExtractionService
@@ -36,9 +43,11 @@ from app.services.normalization_service import normalize_raw_user_data
 from app.services.profile_merge_service import ProfileMergeService
 from app.services.slm_service import get_default_slm_service
 from app.services.storage_service import LocalStorageService
+from app.services.tax_computation_service import MissingTaxConfigError
 
 router = APIRouter()
 VALIDATION_REPORTS: dict[str, ValidationReport] = {}
+TAX_COMPUTATIONS: dict[str, TaxComputationResult] = {}
 
 
 def _storage_service() -> LocalStorageService:
@@ -128,6 +137,40 @@ def explain_validation(request: ValidationExplainRequest) -> ValidationExplainRe
     if report is None:
         raise HTTPException(status_code=404, detail="Validation report not found")
     return ValidationAgent().explain(report)
+
+
+@router.post("/tax/compute", response_model=TaxComputationResult)
+def compute_tax(request: TaxComputeRequest) -> TaxComputationResult:
+    try:
+        result = TaxComputationAgent().run(
+            profile=request.profile,
+            candidate_itr=request.candidate_itr,
+            validation_report=request.validation_report,
+            selected_regime=request.selected_regime,
+        )
+    except MissingTaxConfigError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "missing_tax_config", "message": str(exc)},
+        ) from exc
+    TAX_COMPUTATIONS[result.computation_id] = result
+    return result
+
+
+@router.post("/tax/explain", response_model=TaxExplanationResponse)
+def explain_tax(request: TaxExplainRequest) -> TaxExplanationResponse:
+    result = TAX_COMPUTATIONS.get(request.computation_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Tax computation not found")
+    return TaxComputationAgent().explain(result)
+
+
+@router.get("/tax/{computation_id}", response_model=TaxComputationResult)
+def get_tax_computation(computation_id: str) -> TaxComputationResult:
+    result = TAX_COMPUTATIONS.get(computation_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Tax computation not found")
+    return result
 
 
 @router.post("/itr-decision", response_model=ITRDecisionResponse)
