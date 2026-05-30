@@ -84,6 +84,19 @@ describe("normalizeProfile Aadhaar payload", () => {
 
     assert.equal(payload.aadhaar_number, "123456789012");
   });
+
+  it("sends reviewed deduction amounts to scalar canonical fields", async () => {
+    const payload = await captureNormalizePayload({
+      ...baseForm,
+      has80C: "yes",
+      deduction80CAmount: "55555",
+      has80D: "yes",
+      deduction80DAmount: "25000",
+    });
+
+    assert.equal(payload.section_80c_amount, 55555);
+    assert.equal(payload.section_80d_amount, 25000);
+  });
 });
 
 describe("document intake API helpers", () => {

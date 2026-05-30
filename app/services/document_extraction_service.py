@@ -65,6 +65,8 @@ class DocumentExtractionService:
 
     def _extract_pdf(self, document_id: str, storage_path: str) -> ExtractionResult:
         try:
+            from pdfminer.pdfdocument import PDFDocument, PDFPasswordIncorrect
+            from pdfminer.pdfparser import PDFParser
             import pdfplumber
         except ImportError:
             return ExtractionResult(
@@ -72,6 +74,19 @@ class DocumentExtractionService:
                 status="warning",
                 warnings=["PDF extraction dependency is unavailable; OCR is not configured in Phase 1."],
             )
+
+        try:
+            with open(storage_path, "rb") as pdf_file:
+                PDFDocument(PDFParser(pdf_file))
+        except PDFPasswordIncorrect:
+            return ExtractionResult(
+                document_id=document_id,
+                status="rejected",
+                warnings=["Encrypted PDFs are not supported in Phase 1."],
+            )
+        except Exception:
+            # Let pdfplumber produce the user-facing extraction warning below.
+            pass
 
         try:
             with pdfplumber.open(storage_path) as pdf:
@@ -84,7 +99,7 @@ class DocumentExtractionService:
                 text = "\n".join(page.extract_text() or "" for page in pdf.pages)
         except Exception as exc:
             message = str(exc).lower()
-            if "encrypt" in message or "password" in message:
+            if "encrypt" in message or "decrypt" in message or "password" in message:
                 return ExtractionResult(
                     document_id=document_id,
                     status="rejected",

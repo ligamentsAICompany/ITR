@@ -92,6 +92,8 @@ export function normalizeProfile(form: BasicFormState): Promise<CanonicalTaxProf
       ...(form.has80C === "yes" ? [{ section_code: "80C", amount: Number(form.deduction80CAmount) }] : []),
       ...(form.has80D === "yes" ? [{ section_code: "80D", amount: Number(form.deduction80DAmount) }] : []),
     ],
+    section_80c_amount: Number(form.deduction80CAmount || 0),
+    section_80d_amount: Number(form.deduction80DAmount || 0),
     has_deductions: form.has80C === "yes" || form.has80D === "yes" ? "yes" : form.hasDeductions,
   });
 }

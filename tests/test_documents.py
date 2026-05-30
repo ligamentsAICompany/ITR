@@ -25,11 +25,23 @@ def test_storage_sanitizes_filename_hashes_content_and_writes_metadata(tmp_path:
     )
 
     assert record.safe_filename == "Form_16_FY25.csv"
+    assert record.original_filename == "Form_16_FY25.csv"
     assert record.sha256
     assert record.size_bytes == 21
     assert record.storage_path.endswith("Form_16_FY25.csv")
     assert Path(record.storage_path).read_bytes() == b"Gross Salary,1200000\n"
     assert storage.get(record.document_id).sha256 == record.sha256
+
+
+def test_storage_rejects_non_uuid_document_ids(tmp_path: Path):
+    storage_root = tmp_path / "uploads"
+    outside_dir = tmp_path / "outside"
+    outside_dir.mkdir()
+    (outside_dir / "metadata.json").write_text("{}", encoding="utf-8")
+    storage = LocalStorageService(storage_root)
+
+    with pytest.raises(FileNotFoundError):
+        storage.get("../outside")
 
 
 def test_document_validation_rejects_unsafe_extension_and_mime():
@@ -56,8 +68,11 @@ def test_csv_extraction_maps_conservative_tax_fields(tmp_path: Path):
     storage = LocalStorageService(tmp_path)
     record = storage.save(
         content=(
-            b"Gross Salary,TDS,Interest Income,Section 80C\n"
-            b"1200000,125000,4200,150000\n"
+            b"PAN,Assessment Year,Previous Year,Gross Salary,Employer Name,TDS,Interest Income,"
+            b"Section 80C,Section 80D,House Property Income,House Property Interest,"
+            b"STCG Amount,LTCG 112A Amount,Other LTCG Amount\n"
+            b"ABCDE1234F,2026-27,2025-26,1200000,Example Pvt Ltd,125000,4200,"
+            b"150000,25000,180000,90000,30000,50000,12000\n"
         ),
         original_filename="form16.csv",
         content_type="text/csv",
@@ -68,11 +83,42 @@ def test_csv_extraction_maps_conservative_tax_fields(tmp_path: Path):
 
     fields_by_path = {field.raw_path: field for field in result.fields}
     assert result.status == "completed"
+    assert fields_by_path["pan"].value == "ABCDE1234F"
+    assert fields_by_path["previousYear"].value == "2025-26"
     assert fields_by_path["salaryIncome"].value == 1200000
+    assert fields_by_path["employerName"].value == "Example Pvt Ltd"
     assert fields_by_path["tdsSalary"].value == 125000
     assert fields_by_path["otherSourcesInterest"].value == 4200
     assert fields_by_path["deduction80CAmount"].value == 150000
+    assert fields_by_path["deduction80DAmount"].value == 25000
+    assert fields_by_path["housePropertyIncome"].value == 180000
+    assert fields_by_path["housePropertyInterest"].value == 90000
+    assert fields_by_path["stcgAmount"].value == 30000
+    assert fields_by_path["ltcg112AAmount"].value == 50000
+    assert fields_by_path["otherLtcgAmount"].value == 12000
     assert all(field.source.document_id == record.document_id for field in result.fields)
+
+
+def test_pdf_decryption_failures_are_rejected(tmp_path: Path, monkeypatch):
+    storage = LocalStorageService(tmp_path)
+    record = storage.save(
+        content=b"%PDF-1.4 encrypted placeholder",
+        original_filename="locked.pdf",
+        content_type="application/pdf",
+        document_type=DocumentType.PDF_TEXT,
+    )
+
+    def raise_decrypt_error(_storage_path: str):
+        raise Exception("file has not been decrypted")
+
+    import pdfplumber
+
+    monkeypatch.setattr(pdfplumber, "open", raise_decrypt_error)
+
+    result = DocumentExtractionService(storage).extract(record.document_id)
+
+    assert result.status == "rejected"
+    assert result.warnings == ["Encrypted PDFs are not supported in Phase 1."]
 
 
 def test_merge_applies_only_explicitly_approved_fields():

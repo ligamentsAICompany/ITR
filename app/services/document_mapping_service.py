@@ -8,10 +8,20 @@ from app.models.document import ExtractedField, ExtractionSource
 
 
 HEADER_MAPPINGS: dict[str, tuple[str, str, str, float]] = {
+    "pan": ("PAN", "pan", "user_identity.pan", 0.82),
+    "assessment year": ("Assessment Year", "assessmentYear", "assessment_year", 0.82),
+    "ay": ("Assessment Year", "assessmentYear", "assessment_year", 0.76),
+    "previous year": ("Previous Year", "previousYear", "previous_year", 0.82),
+    "py": ("Previous Year", "previousYear", "previous_year", 0.76),
     "gross salary": ("Gross Salary", "salaryIncome", "income_heads.salary.gross_amount", 0.9),
     "salary": ("Gross Salary", "salaryIncome", "income_heads.salary.gross_amount", 0.82),
+    "employer name": ("Employer Name", "employerName", "income_heads.salary.employer_name", 0.86),
+    "employer": ("Employer Name", "employerName", "income_heads.salary.employer_name", 0.76),
+    "employer tan": ("Employer TAN", "employerTan", "income_heads.salary.employer_tan", 0.72),
+    "tan": ("Employer TAN", "employerTan", "income_heads.salary.employer_tan", 0.68),
     "tds": ("TDS Salary", "tdsSalary", "tax_payments.tds_salary", 0.82),
     "tds salary": ("TDS Salary", "tdsSalary", "tax_payments.tds_salary", 0.9),
+    "salary tds": ("TDS Salary", "tdsSalary", "tax_payments.tds_salary", 0.9),
     "interest income": (
         "Interest Income",
         "otherSourcesInterest",
@@ -28,6 +38,62 @@ HEADER_MAPPINGS: dict[str, tuple[str, str, str, float]] = {
     "80c": ("Section 80C", "deduction80CAmount", "deductions.section_80c_amount", 0.82),
     "section 80d": ("Section 80D", "deduction80DAmount", "deductions.section_80d_amount", 0.86),
     "80d": ("Section 80D", "deduction80DAmount", "deductions.section_80d_amount", 0.82),
+    "house property income": (
+        "House Property Income",
+        "housePropertyIncome",
+        "income_heads.house_property.gross_amount",
+        0.78,
+    ),
+    "house property annual value": (
+        "House Property Annual Value",
+        "housePropertyIncome",
+        "income_heads.house_property.annual_value",
+        0.78,
+    ),
+    "annual value": (
+        "House Property Annual Value",
+        "housePropertyIncome",
+        "income_heads.house_property.annual_value",
+        0.72,
+    ),
+    "house property interest": (
+        "House Property Interest",
+        "housePropertyInterest",
+        "income_heads.house_property.interest_on_housing_loan",
+        0.78,
+    ),
+    "interest on housing loan": (
+        "House Property Interest",
+        "housePropertyInterest",
+        "income_heads.house_property.interest_on_housing_loan",
+        0.78,
+    ),
+    "capital gains": ("Capital Gains", "capitalGainsIncome", "income_heads.capital_gains.gross_amount", 0.7),
+    "stcg amount": ("STCG Amount", "stcgAmount", "income_heads.capital_gains.stcg_amount", 0.8),
+    "short term capital gains": (
+        "STCG Amount",
+        "stcgAmount",
+        "income_heads.capital_gains.stcg_amount",
+        0.76,
+    ),
+    "ltcg 112a amount": (
+        "LTCG 112A Amount",
+        "ltcg112AAmount",
+        "income_heads.capital_gains.ltcg_112a_amount",
+        0.8,
+    ),
+    "112a amount": (
+        "LTCG 112A Amount",
+        "ltcg112AAmount",
+        "income_heads.capital_gains.ltcg_112a_amount",
+        0.76,
+    ),
+    "other ltcg amount": (
+        "Other LTCG Amount",
+        "otherLtcgAmount",
+        "income_heads.capital_gains.other_ltcg_amount",
+        0.78,
+    ),
 }
 
 TEXT_PATTERNS: list[tuple[re.Pattern[str], tuple[str, str, str, float]]] = [
@@ -36,12 +102,60 @@ TEXT_PATTERNS: list[tuple[re.Pattern[str], tuple[str, str, str, float]]] = [
         HEADER_MAPPINGS["gross salary"],
     ),
     (
-        re.compile(r"tds\s*(?:salary)?\s*[:\-]?\s*(?:inr|rs\.?)?\s*([0-9,]+(?:\.\d+)?)", re.I),
+        re.compile(r"\bpan\s*[:\-]?\s*([A-Z]{5}[0-9]{4}[A-Z])\b", re.I),
+        HEADER_MAPPINGS["pan"],
+    ),
+    (
+        re.compile(r"assessment\s+year\s*[:\-]?\s*(20\d{2}-\d{2})", re.I),
+        HEADER_MAPPINGS["assessment year"],
+    ),
+    (
+        re.compile(r"previous\s+year\s*[:\-]?\s*(20\d{2}-\d{2})", re.I),
+        HEADER_MAPPINGS["previous year"],
+    ),
+    (
+        re.compile(r"employer\s+name\s*[:\-]?\s*([^\n\r]+)", re.I),
+        HEADER_MAPPINGS["employer name"],
+    ),
+    (
+        re.compile(r"employer\s+tan\s*[:\-]?\s*([A-Z]{4}[0-9]{5}[A-Z])\b", re.I),
+        HEADER_MAPPINGS["employer tan"],
+    ),
+    (
+        re.compile(r"(?:salary\s+tds|tds\s*salary|tds)\s*[:\-]?\s*(?:inr|rs\.?)?\s*([0-9,]+(?:\.\d+)?)", re.I),
         HEADER_MAPPINGS["tds salary"],
     ),
     (
         re.compile(r"(?:bank\s+)?interest\s+income\s*[:\-]?\s*(?:inr|rs\.?)?\s*([0-9,]+(?:\.\d+)?)", re.I),
         HEADER_MAPPINGS["interest income"],
+    ),
+    (
+        re.compile(r"(?:section\s+)?80c\s*[:\-]?\s*(?:inr|rs\.?)?\s*([0-9,]+(?:\.\d+)?)", re.I),
+        HEADER_MAPPINGS["80c"],
+    ),
+    (
+        re.compile(r"(?:section\s+)?80d\s*[:\-]?\s*(?:inr|rs\.?)?\s*([0-9,]+(?:\.\d+)?)", re.I),
+        HEADER_MAPPINGS["80d"],
+    ),
+    (
+        re.compile(r"house\s+property\s+income\s*[:\-]?\s*(?:inr|rs\.?)?\s*([0-9,]+(?:\.\d+)?)", re.I),
+        HEADER_MAPPINGS["house property income"],
+    ),
+    (
+        re.compile(r"house\s+property\s+interest\s*[:\-]?\s*(?:inr|rs\.?)?\s*([0-9,]+(?:\.\d+)?)", re.I),
+        HEADER_MAPPINGS["house property interest"],
+    ),
+    (
+        re.compile(r"stcg\s*(?:amount)?\s*[:\-]?\s*(?:inr|rs\.?)?\s*([0-9,]+(?:\.\d+)?)", re.I),
+        HEADER_MAPPINGS["stcg amount"],
+    ),
+    (
+        re.compile(r"(?:ltcg\s+)?112a\s*(?:amount)?\s*[:\-]?\s*(?:inr|rs\.?)?\s*([0-9,]+(?:\.\d+)?)", re.I),
+        HEADER_MAPPINGS["ltcg 112a amount"],
+    ),
+    (
+        re.compile(r"other\s+ltcg\s*(?:amount)?\s*[:\-]?\s*(?:inr|rs\.?)?\s*([0-9,]+(?:\.\d+)?)", re.I),
+        HEADER_MAPPINGS["other ltcg amount"],
     ),
 ]
 

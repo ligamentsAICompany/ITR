@@ -126,7 +126,7 @@ export default function Home() {
     pushLog(`extract: ${extractionResult.fields.length} candidate field(s) ready for review`);
   }
 
-  async function acceptExtractedFields(fieldIds: string[]) {
+  async function acceptExtractedFields(fieldIds: string[], reviewedExtraction = extraction) {
     if (!extraction) {
       return;
     }
@@ -134,7 +134,7 @@ export default function Home() {
     setError(null);
     try {
       pushLog("merge: POST /v1/intake/merge-extractions");
-      const mergeResult = await mergeExtractionFields(form, extraction, fieldIds);
+      const mergeResult = await mergeExtractionFields(form, reviewedExtraction ?? extraction, fieldIds);
       const nextForm = normalizeDocumentMerge(applyMergedPayloadToForm(form, mergeResult.merged_payload));
       setForm(nextForm);
       pushLog(`merge: accepted ${mergeResult.applied_field_ids.length} reviewed field(s)`);
@@ -294,7 +294,7 @@ export default function Home() {
             document={uploadedDocument}
             extraction={extraction}
             disabled={loading}
-            onAccept={(fieldIds) => void acceptExtractedFields(fieldIds)}
+            onAccept={(fieldIds, reviewedExtraction) => void acceptExtractedFields(fieldIds, reviewedExtraction)}
           />
 
           <IntakeForm

@@ -5,16 +5,46 @@ type ExtractionReviewPanelProps = {
   document: DocumentRecord | null;
   extraction: ExtractionResult | null;
   disabled: boolean;
-  onAccept: (fieldIds: string[]) => void;
+  onAccept: (fieldIds: string[], reviewedExtraction: ExtractionResult) => void;
+};
+
+type ExtractionReviewPanelContentProps = {
+  document: DocumentRecord;
+  extraction: ExtractionResult;
+  disabled: boolean;
+  onAccept: (fieldIds: string[], reviewedExtraction: ExtractionResult) => void;
 };
 
 export function ExtractionReviewPanel({ document, extraction, disabled, onAccept }: ExtractionReviewPanelProps) {
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
-
   if (!document || !extraction) {
     return null;
   }
+
+  return (
+    <ExtractionReviewPanelContent
+      key={extraction.document_id}
+      document={document}
+      extraction={extraction}
+      disabled={disabled}
+      onAccept={onAccept}
+    />
+  );
+}
+
+function ExtractionReviewPanelContent({ document, extraction, disabled, onAccept }: ExtractionReviewPanelContentProps) {
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(extraction.fields.map((field) => [field.field_id, String(field.value)])),
+  );
+  const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+  const reviewedExtraction: ExtractionResult = {
+    ...extraction,
+    fields: extraction.fields.map((field) => ({
+      ...field,
+      value: fieldValues[field.field_id] ?? field.value,
+    })),
+  };
 
   function toggle(fieldId: string) {
     setSelectedIds((current) =>
@@ -65,7 +95,15 @@ export function ExtractionReviewPanel({ document, extraction, disabled, onAccept
               />
               <span className="flex-1">
                 <span className="block text-sm font-semibold text-[#111827]">{field.label}</span>
-                <span className="mt-1 block text-sm text-gray-700">{String(field.value)}</span>
+                <input
+                  aria-label={`Edit ${field.label}`}
+                  className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
+                  disabled={disabled}
+                  value={fieldValues[field.field_id] ?? String(field.value)}
+                  onChange={(event) =>
+                    setFieldValues((current) => ({ ...current, [field.field_id]: event.target.value }))
+                  }
+                />
                 <span className="mt-1 block text-xs text-gray-500">
                   {field.raw_path} {"->"} {field.canonical_path} | confidence {Math.round(field.confidence * 100)}%
                 </span>
@@ -78,7 +116,7 @@ export function ExtractionReviewPanel({ document, extraction, disabled, onAccept
       <button
         type="button"
         disabled={disabled || selectedIds.length === 0}
-        onClick={() => onAccept(selectedIds)}
+        onClick={() => onAccept(selectedIds, reviewedExtraction)}
         className="mt-5 rounded-lg bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
       >
         Accept selected values
