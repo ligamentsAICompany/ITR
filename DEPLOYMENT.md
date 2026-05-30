@@ -149,6 +149,34 @@ policy.
 6. Verify `/v1/filing/provider-diagnostics` shows safe fields only and does not
    include raw provider payloads, PAN/Aadhaar, credentials, or internal paths.
 
+### Phase 12 Sandbox Credential Onboarding
+
+Use `docs/SANDBOX_ONBOARDING.md` as the operator checklist before a client
+pilot. The approved sandbox onboarding gate requires:
+
+- Provider/ERI agreement approved.
+- Sandbox API specs, base URL, token/auth endpoint, callback URL, signing
+  requirements, payload format, and status codes received.
+- E-verification and acknowledgement support confirmed, or explicitly marked
+  unsupported in the provider spec.
+- Required credentials identified and stored in Secret Manager.
+- Cloud Run service account granted access only to the required sandbox secrets.
+- Callback URL registered and callback signing configured fail-closed.
+- Sandbox provider spec registered with
+  `python -m app.tools.register_provider_spec --file sandbox_provider_spec.json`.
+- Sandbox secret access verified with `python -m app.tools.verify_secrets`.
+- Sandbox contract tests run with
+  `python -m app.tools.run_provider_contract_tests --provider eri --mode sandbox`.
+- Sandbox submit smoke test run with `python -m app.tools.run_sandbox_smoke`.
+- Status check, e-verification, and acknowledgement verified against approved
+  sandbox credentials, or marked `NOT_VERIFIED`/unsupported honestly.
+- No real taxpayer data used in sandbox tests.
+
+If approved sandbox credentials/specs are unavailable, do not fake success.
+Generate the readiness report with
+`python -m app.tools.generate_pilot_readiness_report` and keep sandbox execution
+marked `NOT_VERIFIED`.
+
 ### Live Rollout Control Checklist
 
 Live filing cannot be enabled until every item below is complete:

@@ -23,6 +23,7 @@ export function ProviderStatusPanel({
   const supportedOperations = diagnostics?.supported_operations ?? [];
   const contractStatus = diagnostics?.last_contract_test?.status ?? "not run";
   const sandboxContractStatus = diagnostics?.sandbox_contract_status ?? contractStatus;
+  const sandboxSmokeStatus = diagnostics?.sandbox_smoke_status ?? "not verified";
   const safeReadiness = diagnostics?.safe_readiness ?? (missingConfig ? "not_configured" : "configured");
   const lastStatusCheck = diagnostics?.last_status_check ?? submission?.last_checked_at;
   const secretBackend = diagnostics?.secret_backend?.replaceAll("_", " ") ?? "env";
@@ -52,12 +53,24 @@ export function ProviderStatusPanel({
           <dd className="mt-1 text-slate-600">{diagnostics?.sandbox_configured ? "Sandbox configured" : "Sandbox not configured"}</dd>
         </div>
         <div className="rounded-xl bg-slate-50 p-3">
+          <dt className="font-semibold text-slate-900">Sandbox secrets</dt>
+          <dd className="mt-1 text-slate-600">{diagnostics?.sandbox_secrets_verified ? "Sandbox secrets verified" : "Sandbox secrets not verified"}</dd>
+        </div>
+        <div className="rounded-xl bg-slate-50 p-3">
+          <dt className="font-semibold text-slate-900">Sandbox spec</dt>
+          <dd className="mt-1 text-slate-600">{diagnostics?.sandbox_spec_active ? "Sandbox spec active" : "Sandbox spec missing"}</dd>
+        </div>
+        <div className="rounded-xl bg-slate-50 p-3">
           <dt className="font-semibold text-slate-900">Sandbox calls</dt>
           <dd className="mt-1 text-slate-600">{diagnostics?.sandbox_calls_allowed ? "Sandbox calls enabled" : "Sandbox calls disabled"}</dd>
         </div>
         <div className="rounded-xl bg-slate-50 p-3">
           <dt className="font-semibold text-slate-900">Sandbox contract</dt>
           <dd className="mt-1 capitalize text-slate-600">{sandboxContractStatus.replaceAll("_", " ")}</dd>
+        </div>
+        <div className="rounded-xl bg-slate-50 p-3">
+          <dt className="font-semibold text-slate-900">Sandbox smoke</dt>
+          <dd className="mt-1 capitalize text-slate-600">{sandboxSmokeStatus.replaceAll("_", " ")}</dd>
         </div>
         <div className="rounded-xl bg-slate-50 p-3">
           <dt className="font-semibold text-slate-900">Last status check</dt>
@@ -94,6 +107,36 @@ export function ProviderStatusPanel({
           </div>
         ) : null}
       </dl>
+      {diagnostics ? (
+        <div className="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-950">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">Pilot readiness</p>
+          <h4 className="mt-1 text-lg font-semibold">{diagnostics.pilot_ready ? "Pilot ready" : "Pilot not ready"}</h4>
+          <p className="mt-2 font-semibold">Client pilot readiness does not mean live filing is enabled.</p>
+          <PilotList title="Blockers" items={diagnostics.pilot_blockers} empty="No pilot blockers." />
+          <PilotList title="Warnings" items={diagnostics.pilot_warnings} empty="No pilot warnings." />
+          <PilotList title="Verified items" items={diagnostics.pilot_verified_items} empty="No verified pilot items." />
+          <PilotList title="Not verified items" items={diagnostics.pilot_not_verified_items} empty="No unverified pilot items." />
+        </div>
+      ) : null}
     </section>
+  );
+}
+
+function PilotList({ title, items, empty }: { title: string; items: string[]; empty: string }) {
+  return (
+    <div className="mt-3">
+      <p className="font-semibold">{title}</p>
+      {items.length ? (
+        <ul className="mt-1 space-y-1">
+          {items.map((item) => (
+            <li key={item} className="capitalize">
+              {item.replaceAll("_", " ")}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1">{empty}</p>
+      )}
+    </div>
   );
 }

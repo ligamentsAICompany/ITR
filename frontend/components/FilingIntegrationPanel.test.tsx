@@ -156,9 +156,18 @@ describe("filing integration UI", () => {
             live_filing_enabled: false,
             secret_backend: "env",
             sandbox_configured: false,
+            sandbox_secrets_verified: false,
+            sandbox_spec_active: false,
             sandbox_calls_allowed: false,
             sandbox_contract_status: "not_verified",
+            sandbox_smoke_status: "not_verified",
             last_sandbox_contract_test_at: "2026-05-30T00:00:00Z",
+            last_sandbox_smoke_at: null,
+            pilot_ready: false,
+            pilot_blockers: ["sandbox_secrets_not_verified", "sandbox_spec_missing"],
+            pilot_warnings: ["Live filing remains disabled."],
+            pilot_verified_items: ["no_live_filing_enabled"],
+            pilot_not_verified_items: ["sandbox_contract_tests_passed"],
             live_configured: false,
             live_enabled: false,
             live_blocked_reason: "Live filing is disabled until approval metadata and ALLOW_LIVE_FILING are configured.",
@@ -201,9 +210,16 @@ describe("filing integration UI", () => {
     assert.match(html, /acknowledgement unavailable/i);
     assert.match(html, /sandbox calls disabled/i);
     assert.match(html, /sandbox contract/i);
+    assert.match(html, /pilot readiness/i);
+    assert.match(html, /sandbox secrets not verified/i);
+    assert.match(html, /sandbox spec missing/i);
+    assert.match(html, /Live filing remains disabled\./);
+    assert.match(html, /no live filing enabled/i);
+    assert.match(html, /sandbox contract tests passed/i);
+    assert.match(html, /Client pilot readiness does not mean live filing is enabled\./);
     assert.match(html, /live disabled reason/i);
     assert.match(html, /ERI_SANDBOX_CLIENT_ID/i);
-    assert.doesNotMatch(html, /client_secret|access token|raw payload/i);
+    assert.doesNotMatch(html, /client_secret|access token|raw payload|sandbox-secret-value/i);
   });
 
   it("renders sandbox configured diagnostics without leaking secrets", () => {
@@ -225,9 +241,18 @@ describe("filing integration UI", () => {
           live_filing_enabled: false,
           secret_backend: "gcp_secret_manager",
           sandbox_configured: true,
+          sandbox_secrets_verified: true,
+          sandbox_spec_active: true,
           sandbox_calls_allowed: true,
           sandbox_contract_status: "passed",
+          sandbox_smoke_status: "passed",
           last_sandbox_contract_test_at: "2026-05-30T00:00:00Z",
+          last_sandbox_smoke_at: "2026-05-30T00:00:00Z",
+          pilot_ready: true,
+          pilot_blockers: [],
+          pilot_warnings: ["Ready only for controlled sandbox client pilot."],
+          pilot_verified_items: ["sandbox_secrets_verified", "sandbox_smoke_passed"],
+          pilot_not_verified_items: [],
           live_configured: false,
           live_enabled: false,
           live_blocked_reason: "Live filing remains disabled for Phase 11.",
@@ -247,6 +272,10 @@ describe("filing integration UI", () => {
     assert.match(html, /Sandbox submission only\. This is not a real tax filing\./);
     assert.match(html, /sandbox configured/i);
     assert.match(html, /sandbox calls enabled/i);
+    assert.match(html, /pilot ready/i);
+    assert.match(html, /sandbox smoke passed/i);
+    assert.match(html, /Ready only for controlled sandbox client pilot\./);
+    assert.match(html, /Client pilot readiness does not mean live filing is enabled\./);
     assert.match(html, /gcp secret manager/i);
     assert.match(html, /submit return/i);
     assert.doesNotMatch(html, /sandbox-secret|client_secret|access token|raw payload/i);

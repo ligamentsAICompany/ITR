@@ -1,6 +1,7 @@
 """Factory and configuration checks for ERI provider adapters."""
 
 from dataclasses import dataclass, field
+from os import getenv
 
 from app.core.config import get_settings
 from app.models.provider_integration import ProviderCapability, ProviderMode
@@ -56,9 +57,11 @@ def get_eri_provider():
         return MockFilingProvider(provider_mode="mock")
     settings = get_settings()
     credentials = ProviderCredentialsService().load(mode=config.mode)
+    spec = ProviderSpecService().repository.get_active(provider_name="eri", provider_mode=config.mode)
+    sandbox_mocked = config.mode == ProviderMode.SANDBOX and getenv("SANDBOX_PROVIDER_TRANSPORT", "").lower() == "mock"
     client = EriClient(
-        base_url=getattr(settings, "eri_base_url", None),
-        token_url=getattr(settings, "eri_token_url", None),
+        base_url=getattr(settings, "eri_base_url", None) or (spec.base_url if spec else None),
+        token_url=getattr(settings, "eri_token_url", None) or (spec.token_url if spec else None),
         timeout_seconds=getattr(settings, "eri_timeout_seconds", 10),
         retry_count=getattr(settings, "eri_retry_count", 2),
         allow_network=config.mode == ProviderMode.SANDBOX and settings.allow_sandbox_provider_calls,
@@ -66,7 +69,7 @@ def get_eri_provider():
         client_id=credentials.client_id,
         client_secret=credentials.client_secret,
     )
-    return EriProvider(mode=config.mode, client=client, sandbox_mocked=False, capabilities=config.capabilities)
+    return EriProvider(mode=config.mode, client=client, sandbox_mocked=sandbox_mocked, capabilities=config.capabilities)
 
 
 def _normalize_provider(provider: str) -> str:

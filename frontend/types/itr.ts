@@ -442,9 +442,18 @@ export type ProviderDiagnostics = {
   live_filing_enabled: boolean;
   secret_backend: "env" | "gcp_secret_manager" | string;
   sandbox_configured: boolean;
+  sandbox_secrets_verified: boolean;
+  sandbox_spec_active: boolean;
   sandbox_calls_allowed: boolean;
   sandbox_contract_status: "passed" | "failed" | "not_verified" | string;
+  sandbox_smoke_status: "passed" | "failed" | "not_verified" | string;
   last_sandbox_contract_test_at?: string | null;
+  last_sandbox_smoke_at?: string | null;
+  pilot_ready: boolean;
+  pilot_blockers: string[];
+  pilot_warnings: string[];
+  pilot_verified_items: string[];
+  pilot_not_verified_items: string[];
   live_configured: boolean;
   live_enabled: boolean;
   live_blocked_reason?: string | null;

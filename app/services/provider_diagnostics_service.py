@@ -7,8 +7,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.config import get_settings
 from app.models.provider_integration import ProviderMode
 from app.repositories.provider_spec_repository import ProviderContractResultRepository, ProviderSpecRepository
+from app.services.pilot_readiness_service import PilotReadinessService
 from app.services.provider_credentials_service import ProviderCredentialsService
 from app.services.provider_spec_service import ProviderSpecService
+from app.services.secret_verification_service import SecretVerificationService
 
 
 class ProviderDiagnostics(BaseModel):
@@ -20,9 +22,18 @@ class ProviderDiagnostics(BaseModel):
     live_filing_enabled: bool
     secret_backend: str
     sandbox_configured: bool
+    sandbox_secrets_verified: bool
+    sandbox_spec_active: bool
     sandbox_calls_allowed: bool
     sandbox_contract_status: str
+    sandbox_smoke_status: str
     last_sandbox_contract_test_at: datetime | None = None
+    last_sandbox_smoke_at: datetime | None = None
+    pilot_ready: bool
+    pilot_blockers: list[str] = Field(default_factory=list)
+    pilot_warnings: list[str] = Field(default_factory=list)
+    pilot_verified_items: list[str] = Field(default_factory=list)
+    pilot_not_verified_items: list[str] = Field(default_factory=list)
     live_configured: bool
     live_enabled: bool
     live_blocked_reason: str | None = None
@@ -70,9 +81,11 @@ class ProviderDiagnosticsService:
         contract_provider = "mock" if readiness.provider == "mock" else "eri"
         last_contract = self.result_repository.latest(provider=contract_provider, mode=readiness.mode) or {}
         sandbox_contract = self.result_repository.latest(provider="eri", mode="sandbox") or {}
+        sandbox_smoke = self.result_repository.latest(provider="eri", mode="sandbox_smoke") or {}
         sandbox_spec = self.spec_repository.get_active(provider_name="eri", provider_mode=ProviderMode.SANDBOX)
-        sandbox_credentials = ProviderCredentialsService().load(mode=ProviderMode.SANDBOX)
-        sandbox_configured = sandbox_spec is not None and sandbox_credentials.configured
+        sandbox_secrets_verified = SecretVerificationService().verify_sandbox().verified
+        sandbox_configured = sandbox_spec is not None and sandbox_secrets_verified
+        pilot_report = PilotReadinessService(spec_repository=self.spec_repository, result_repository=self.result_repository).generate()
         live_spec = self.spec_repository.get_active(provider_name="eri", provider_mode=ProviderMode.LIVE)
         live_credentials = ProviderCredentialsService().load(mode=ProviderMode.LIVE)
         live_configured = live_spec is not None and live_credentials.configured and settings.live_filing_approval_complete
@@ -95,9 +108,18 @@ class ProviderDiagnosticsService:
             live_filing_enabled=live_enabled and readiness.mode == "live" and readiness.configured,
             secret_backend=settings.secret_backend,
             sandbox_configured=sandbox_configured,
+            sandbox_secrets_verified=sandbox_secrets_verified,
+            sandbox_spec_active=sandbox_spec is not None,
             sandbox_calls_allowed=settings.allow_sandbox_provider_calls,
             sandbox_contract_status=str(sandbox_contract.get("status") or "not_verified"),
+            sandbox_smoke_status=str(sandbox_smoke.get("status") or "not_verified"),
             last_sandbox_contract_test_at=_parse_datetime(sandbox_contract.get("tested_at")),
+            last_sandbox_smoke_at=_parse_datetime(sandbox_smoke.get("tested_at")),
+            pilot_ready=pilot_report.pilot_ready,
+            pilot_blockers=pilot_report.blockers,
+            pilot_warnings=pilot_report.warnings,
+            pilot_verified_items=pilot_report.verified_items,
+            pilot_not_verified_items=pilot_report.not_verified_items,
             live_configured=live_configured,
             live_enabled=live_enabled,
             live_blocked_reason=live_blocked_reason,
