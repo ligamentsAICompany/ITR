@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.core.rate_limit import rate_limiter
-from app.core.security import mask_aadhaar, mask_pan
+from app.core.security import mask_aadhaar, mask_pan, sanitize_for_log
 from app.main import app
 
 
@@ -11,6 +11,20 @@ client = TestClient(app)
 def test_masks_sensitive_identifiers():
     assert mask_pan("ABCDE1234F") == "ABCDE****F"
     assert mask_aadhaar("123456789012") == "**** **** 9012"
+
+
+def test_sanitizer_masks_sensitive_patterns_in_unknown_fields():
+    sanitized = sanitize_for_log(
+        {
+            "loc": ["body", "raw_text"],
+            "input": "PAN ABCDE1234F Aadhaar 123456789012",
+        }
+    )
+
+    assert "ABCDE1234F" not in str(sanitized)
+    assert "123456789012" not in str(sanitized)
+    assert "ABCDE****F" in str(sanitized)
+    assert "**** **** 9012" in str(sanitized)
 
 
 def test_normalize_bad_pan_returns_400_without_echoing_sensitive_values():

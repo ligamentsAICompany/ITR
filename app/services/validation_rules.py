@@ -230,6 +230,21 @@ def run_profile_rules(
             )
         )
 
+    low_confidence_fields = [field for field in approved_fields if field.confidence < 0.75]
+    if low_confidence_fields:
+        issues.append(
+            issue(
+                "evidence.low_confidence_extraction",
+                ValidationSeverity.LOW,
+                "Low confidence extraction needs review",
+                "One or more approved extracted values have low confidence and need manual review.",
+                "extractions",
+                "Review the low-confidence evidence manually before relying on validation.",
+                source_documents=sorted({field.source.document_id for field in low_confidence_fields}),
+                evidence_refs=[field.source.locator for field in low_confidence_fields],
+            )
+        )
+
     return issues, list(dict.fromkeys(missing_fields))
 
 
@@ -255,6 +270,7 @@ def compare_approved_fields(
                     extracted_value=field.value,
                     source_documents=[field.source.document_id],
                     evidence_refs=[field.source.locator],
+                    source_confidences=[field.confidence],
                 )
             )
             message = f"Approved evidence for {human_field(field.canonical_path)} differs from the canonical profile."

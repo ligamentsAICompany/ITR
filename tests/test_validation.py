@@ -177,6 +177,7 @@ def test_salary_mismatch_is_high_conflict():
     assert issue["severity"] == "high"
     assert issue["field_path"] == "income_heads.salary.gross_amount"
     assert report["conflicts"][0]["field_path"] == "income_heads.salary.gross_amount"
+    assert report["conflicts"][0]["source_confidences"] == [0.98]
 
 
 def test_tds_mismatch_is_high_conflict():
@@ -258,6 +259,22 @@ def test_foreign_assets_requires_high_expert_review():
     assert issue["severity"] == "high"
     assert issue["status"] == "needs_review"
     assert report["overall_status"] == "needs_review"
+
+
+def test_approved_low_confidence_extraction_warns_without_auto_merging():
+    report = run_validation(
+        documents=[document("doc-form16", "form16"), document("doc-ais", "ais")],
+        extractions=[
+            extraction("doc-form16", "salary-1", "income_heads.salary.gross_amount", 1200000, confidence=0.4),
+        ],
+        approved_field_ids=["salary-1"],
+    )
+
+    issue = issue_by_rule(report, "evidence.low_confidence_extraction")
+    assert issue["severity"] == "low"
+    assert issue["source_documents"] == ["doc-form16"]
+    assert report["overall_status"] == "warning"
+    assert report["readiness_score"] == 97
 
 
 def test_no_document_manual_warning_does_not_crash_or_fail():

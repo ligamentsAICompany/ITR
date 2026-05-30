@@ -25,6 +25,11 @@ export function ReconciliationConflictPanel({ conflicts }: { conflicts: Reconcil
             <p className="mt-3 text-xs text-gray-600">
               Evidence links: {[...conflict.source_documents, ...conflict.evidence_refs].join(", ") || "None"}
             </p>
+            {conflict.source_confidences?.length ? (
+              <p className="mt-1 text-xs text-gray-600">
+                Confidence: {conflict.source_confidences.map((confidence) => `${Math.round(confidence * 100)}%`).join(", ")}
+              </p>
+            ) : null}
           </div>
         ))}
       </div>

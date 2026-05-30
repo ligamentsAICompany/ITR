@@ -54,6 +54,7 @@ const baseReport: ValidationReport = {
       extracted_value: 1400000,
       source_documents: ["doc-form16"],
       evidence_refs: ["csv:1"],
+      source_confidences: [0.98],
     },
   ],
   warnings: ["No documents uploaded; validation is limited to manual entries."],
@@ -94,6 +95,7 @@ describe("validation report UI", () => {
     assert.match(html, /1200000/);
     assert.match(html, /1400000/);
     assert.match(html, /doc-form16/);
+    assert.match(html, /98%/);
   });
 
   it("validation report does not erase ITR recommendation", () => {

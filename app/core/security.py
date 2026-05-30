@@ -5,6 +5,8 @@ from typing import Any
 
 SENSITIVE_KEYS = {"pan", "aadhaar", "aadhaar_number", "aadhaar_last4"}
 CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+PAN_RE = re.compile(r"\b[A-Z]{5}[0-9]{4}[A-Z]\b", re.IGNORECASE)
+AADHAAR_RE = re.compile(r"\b[0-9]{12}\b")
 DANGEROUS_PATTERNS = (
     re.compile(r"<\s*/?\s*script\b", re.IGNORECASE),
     re.compile(r"javascript\s*:", re.IGNORECASE),
@@ -50,8 +52,13 @@ def sanitize_for_log(value: Any) -> Any:
     if isinstance(value, list):
         return [sanitize_for_log(item) for item in value]
     if isinstance(value, str):
-        return CONTROL_CHARS.sub("", value)
+        return _mask_sensitive_patterns(CONTROL_CHARS.sub("", value))
     return value
+
+
+def _mask_sensitive_patterns(value: str) -> str:
+    value = PAN_RE.sub(lambda match: mask_pan(match.group(0)) or "****", value)
+    return AADHAAR_RE.sub(lambda match: mask_aadhaar(match.group(0)) or "****", value)
 
 
 def _sanitize_validation_error(error: dict[str, Any]) -> dict[str, Any]:

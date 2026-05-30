@@ -135,6 +135,7 @@ export type ReconciliationConflict = {
   extracted_value: unknown;
   source_documents: string[];
   evidence_refs: string[];
+  source_confidences?: number[];
 };
 
 export type ValidationReport = {

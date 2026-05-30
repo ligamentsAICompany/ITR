@@ -62,6 +62,7 @@ class ReconciliationConflict(StrictValidationModel):
     extracted_value: Any | None = None
     source_documents: list[str] = Field(default_factory=list)
     evidence_refs: list[str] = Field(default_factory=list)
+    source_confidences: list[float] = Field(default_factory=list)
 
     @field_validator("profile_value", "extracted_value")
     @classmethod
