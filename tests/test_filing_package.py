@@ -242,6 +242,24 @@ def test_package_response_and_artifacts_do_not_leak_sensitive_or_internal_values
         assert "storage_path" not in content
 
 
+def test_validation_warning_text_is_masked_in_artifacts():
+    report = validation()
+    report.warnings = ["PAN ABCDE1234F and Aadhaar 123456789012 require review."]
+
+    package = client.post("/v1/filing-packages/generate", json=generate_payload(report)).json()
+    validation_artifact = next(
+        artifact for artifact in package["artifacts"] if artifact["filename"] == "validation_report.json"
+    )
+    content = client.get(
+        f"/v1/filing-packages/{package['package_id']}/artifacts/{validation_artifact['artifact_id']}"
+    ).text
+
+    assert "ABCDE1234F" not in content
+    assert "123456789012" not in content
+    assert "AB****4F" in content
+    assert "************" in content
+
+
 def test_explanation_is_grounded_and_never_claims_submission():
     package = client.post("/v1/filing-packages/generate", json=generate_payload()).json()
 

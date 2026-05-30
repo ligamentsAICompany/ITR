@@ -89,6 +89,11 @@ class ValidationReport(StrictValidationModel):
     warnings: list[str] = Field(default_factory=list)
     evidence_summary: ValidationEvidenceSummary
 
+    @field_validator("warnings")
+    @classmethod
+    def mask_warning_text(cls, value: list[str]) -> list[str]:
+        return [str(mask_sensitive(item)) for item in value]
+
 
 class ValidationRunRequest(StrictValidationModel):
     profile_id: str | None = None
