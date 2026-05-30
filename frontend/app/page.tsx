@@ -7,7 +7,13 @@ import { DemoAuthPanel } from "@/components/DemoAuthPanel";
 import { DocumentUploadCenter } from "@/components/DocumentUploadCenter";
 import { EscalationAlert } from "@/components/EscalationAlert";
 import { ExtractionReviewPanel } from "@/components/ExtractionReviewPanel";
+import { AcknowledgementPanel } from "@/components/AcknowledgementPanel";
+import { EVerificationPanel } from "@/components/EVerificationPanel";
+import { FilingApprovalPanel } from "@/components/FilingApprovalPanel";
+import { FilingConsentPanel } from "@/components/FilingConsentPanel";
 import { FilingPackagePanel } from "@/components/FilingPackagePanel";
+import { FilingReadinessPanel } from "@/components/FilingReadinessPanel";
+import { FilingSubmissionPanel } from "@/components/FilingSubmissionPanel";
 import { IntakeForm } from "@/components/IntakeForm";
 import { ItrExportPanel } from "@/components/ItrExportPanel";
 import { Navbar } from "@/components/Navbar";
@@ -17,32 +23,51 @@ import { ValidationReportPanel } from "@/components/ValidationReportPanel";
 import { WorkflowLog } from "@/components/WorkflowLog";
 import {
   computeTax,
+  approveFilingApproval,
+  checkFilingReadiness,
+  createFilingSubmission,
   downloadFilingPackageArtifact,
   downloadItrExportArtifact,
   generateFilingPackage,
   generateItrExport,
+  getAcknowledgement,
   getClarification,
   getDecision,
+  getEVerificationStatus,
   getExplanation,
   getMissingFields,
+  grantFilingConsent,
+  initiateEVerification,
   applyMergedPayloadToForm,
   mergeExtractionFields,
   normalizeProfile,
+  refreshFilingStatus,
+  rejectFilingApproval,
+  requestFilingApproval,
+  requestFilingConsent,
   runValidation,
+  revokeFilingConsent,
+  submitFilingSubmission,
 } from "@/lib/api";
 import { validateAadhaar } from "@/lib/aadhaar";
+import { getDemoAuthContext } from "@/lib/auth";
 import { maskSensitiveProfile } from "@/lib/security";
 import { validateWorkflowInput } from "@/lib/workflowValidation";
 import type {
   BasicFormState,
+  Acknowledgement,
   CanonicalTaxProfile,
   ClarificationResponse,
   DocumentRecord,
   DraftItrPayload,
   ExtractionResult,
   ExplanationResponse,
+  FilingApproval,
+  FilingConsent,
   FilingPackage,
   FilingPackageArtifact,
+  FilingReadinessResult,
+  FilingSubmission,
   ITRDecisionResponse,
   ItrExport,
   ItrExportArtifact,
@@ -129,6 +154,12 @@ export default function Home() {
   const [filingPackageError, setFilingPackageError] = useState<string | null>(null);
   const [itrExport, setItrExport] = useState<ItrExport | null>(null);
   const [itrExportError, setItrExportError] = useState<string | null>(null);
+  const [filingSubmission, setFilingSubmission] = useState<FilingSubmission | null>(null);
+  const [filingReadiness, setFilingReadiness] = useState<FilingReadinessResult | null>(null);
+  const [filingConsent, setFilingConsent] = useState<FilingConsent | null>(null);
+  const [filingApproval, setFilingApproval] = useState<FilingApproval | null>(null);
+  const [acknowledgement, setAcknowledgement] = useState<Acknowledgement | null>(null);
+  const [filingWorkflowError, setFilingWorkflowError] = useState<string | null>(null);
 
   const questions = useMemo(
     () => (clarification?.question ? [clarification.question] : []),
@@ -159,6 +190,16 @@ export default function Home() {
   function clearItrExport() {
     setItrExport(null);
     setItrExportError(null);
+    clearFilingWorkflow();
+  }
+
+  function clearFilingWorkflow() {
+    setFilingSubmission(null);
+    setFilingReadiness(null);
+    setFilingConsent(null);
+    setFilingApproval(null);
+    setAcknowledgement(null);
+    setFilingWorkflowError(null);
   }
 
   function handleExtraction(document: DocumentRecord, extractionResult: ExtractionResult) {
@@ -404,6 +445,215 @@ export default function Home() {
     }
   }
 
+  async function handleCreateFilingSubmission() {
+    if (!filingPackage || !itrExport) {
+      setFilingWorkflowError("Generate a filing package and official export before creating a filing submission.");
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      pushLog("filing-submission: POST /v1/filing/submissions");
+      const submission = await createFilingSubmission(filingPackage.package_id, itrExport.export_id);
+      setFilingSubmission(submission);
+      pushLog(`filing-submission: ${submission.submission_status.replaceAll("_", " ")}`);
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not create filing submission.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCheckFilingReadiness() {
+    if (!filingSubmission) {
+      setFilingWorkflowError("Create a filing submission draft before checking readiness.");
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      const readiness = await checkFilingReadiness(filingSubmission.submission_id);
+      setFilingReadiness(readiness);
+      pushLog(`filing-readiness: ${readiness.ready ? "ready" : readiness.blockers.join(", ")}`);
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not check filing readiness.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRequestConsent() {
+    if (!filingPackage || !itrExport) {
+      setFilingWorkflowError("Generate a filing package and official export before requesting consent.");
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      const consent = await requestFilingConsent(
+        filingPackage.package_id,
+        itrExport.export_id,
+        "I consent to submit this specific validated export package through the configured filing provider.",
+      );
+      setFilingConsent(consent);
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not request filing consent.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGrantConsent() {
+    if (!filingConsent) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingConsent(await grantFilingConsent(filingConsent.consent_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not grant filing consent.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRevokeConsent() {
+    if (!filingConsent) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingConsent(await revokeFilingConsent(filingConsent.consent_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not revoke filing consent.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRequestApproval() {
+    if (!filingPackage || !itrExport) {
+      setFilingWorkflowError("Generate a filing package and official export before requesting approval.");
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingApproval(await requestFilingApproval(filingPackage.package_id, itrExport.export_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not request filing approval.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleApproveFiling() {
+    if (!filingApproval) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingApproval(await approveFilingApproval(filingApproval.approval_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not approve filing.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRejectFiling() {
+    if (!filingApproval) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingApproval(await rejectFilingApproval(filingApproval.approval_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not reject filing.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSubmitFiling() {
+    if (!filingSubmission) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingSubmission(await submitFilingSubmission(filingSubmission.submission_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not submit through provider.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRefreshFilingStatus() {
+    if (!filingSubmission) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingSubmission(await refreshFilingStatus(filingSubmission.submission_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not refresh filing status.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleInitiateEVerification() {
+    if (!filingSubmission) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingSubmission(await initiateEVerification(filingSubmission.submission_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not initiate e-verification.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRefreshEVerification() {
+    if (!filingSubmission) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingSubmission(await getEVerificationStatus(filingSubmission.submission_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not refresh e-verification.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRefreshAcknowledgement() {
+    if (!filingSubmission) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setAcknowledgement(await getAcknowledgement(filingSubmission.submission_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Acknowledgement is not available yet.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function applyAnswer() {
     const firstMissing = missingFields[0];
     if (!firstMissing) {
@@ -445,6 +695,9 @@ export default function Home() {
     );
     void runWorkflow(nextForm, { resetLogs: false, unresolvedFields: nextUnresolvedFields });
   }
+
+  const currentDemoRole = getDemoAuthContext().role;
+  const canApproveFiling = currentDemoRole === "reviewer" || currentDemoRole === "admin";
 
   return (
     <main className="min-h-screen bg-[#f9fafb]">
@@ -526,6 +779,49 @@ export default function Home() {
             canGenerate={Boolean(profile && decision && validationReport && taxComputation && filingPackage)}
             onGenerate={() => void handleGenerateItrExport()}
             onDownloadArtifact={(artifact) => void handleDownloadItrExportArtifact(artifact)}
+          />
+          <FilingReadinessPanel
+            readiness={filingReadiness}
+            loading={loading}
+            onCheck={() => void handleCheckFilingReadiness()}
+          />
+          <FilingConsentPanel
+            consent={filingConsent}
+            error={filingWorkflowError}
+            loading={loading}
+            onRequest={() => void handleRequestConsent()}
+            onGrant={() => void handleGrantConsent()}
+            onRevoke={() => void handleRevokeConsent()}
+          />
+          <FilingApprovalPanel
+            approval={filingApproval}
+            canApprove={canApproveFiling}
+            error={filingWorkflowError}
+            loading={loading}
+            onRequest={() => void handleRequestApproval()}
+            onApprove={() => void handleApproveFiling()}
+            onReject={() => void handleRejectFiling()}
+          />
+          <FilingSubmissionPanel
+            submission={filingSubmission}
+            readiness={filingReadiness}
+            error={filingWorkflowError}
+            loading={loading}
+            onCreate={() => void handleCreateFilingSubmission()}
+            onSubmit={() => void handleSubmitFiling()}
+            onStatusCheck={() => void handleRefreshFilingStatus()}
+          />
+          <EVerificationPanel
+            submission={filingSubmission}
+            loading={loading}
+            onInitiate={() => void handleInitiateEVerification()}
+            onRefresh={() => void handleRefreshEVerification()}
+          />
+          <AcknowledgementPanel
+            acknowledgement={acknowledgement}
+            error={filingWorkflowError}
+            loading={loading}
+            onRefresh={() => void handleRefreshAcknowledgement()}
           />
           <EscalationAlert show={escalation} />
           <WorkflowLog logs={logs} />

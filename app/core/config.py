@@ -29,6 +29,14 @@ class Settings:
     audit_strict: bool
     cors_allowed_origins: list[str]
     next_public_api_base_url: str | None
+    filing_provider: str
+    filing_provider_mode: str
+    allow_live_filing: bool
+    eri_client_id: str | None
+    eri_client_secret: str | None
+    eri_base_url: str | None
+    eri_callback_url: str | None
+    mock_filing_outcome: str
 
     def __init__(self) -> None:
         self.api_base_url = getenv("API_BASE_URL", "http://127.0.0.1:8000")
@@ -61,6 +69,14 @@ class Settings:
             getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
         )
         self.next_public_api_base_url = getenv("NEXT_PUBLIC_API_BASE_URL") or None
+        self.filing_provider = getenv("FILING_PROVIDER", "mock").lower()
+        self.filing_provider_mode = getenv("FILING_PROVIDER_MODE", self.filing_provider).lower()
+        self.allow_live_filing = getenv("ALLOW_LIVE_FILING", "false").lower() in {"1", "true", "yes", "on"}
+        self.eri_client_id = getenv("ERI_CLIENT_ID") or None
+        self.eri_client_secret = getenv("ERI_CLIENT_SECRET") or None
+        self.eri_base_url = getenv("ERI_BASE_URL") or None
+        self.eri_callback_url = getenv("ERI_CALLBACK_URL") or None
+        self.mock_filing_outcome = getenv("MOCK_FILING_OUTCOME", "success").lower()
 
     @property
     def is_production(self) -> bool:
@@ -76,6 +92,12 @@ class Settings:
             errors.append("PERSISTENCE_BACKEND must be memory, sqlite, or postgres")
         if self.storage_backend not in {"local", "gcs"}:
             errors.append("STORAGE_BACKEND must be local or gcs")
+        if self.filing_provider not in {"mock", "sandbox", "live"}:
+            errors.append("FILING_PROVIDER must be mock, sandbox, or live")
+        if self.filing_provider_mode not in {"mock", "sandbox", "live"}:
+            errors.append("FILING_PROVIDER_MODE must be mock, sandbox, or live")
+        if self.mock_filing_outcome not in {"success", "failure", "pending"}:
+            errors.append("MOCK_FILING_OUTCOME must be success, failure, or pending")
         if self.persistence_backend == "postgres" and not self.database_url:
             errors.append("DATABASE_URL is required when PERSISTENCE_BACKEND=postgres")
         if self.storage_backend == "gcs" and not self.gcs_bucket_name:

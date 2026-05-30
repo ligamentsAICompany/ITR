@@ -1,12 +1,17 @@
 import type {
   BasicFormState,
+  Acknowledgement,
   CanonicalTaxProfile,
   ClarificationResponse,
   DocumentRecord,
   DocumentType,
   ExtractionResult,
   ExplanationResponse,
+  FilingApproval,
+  FilingConsent,
   FilingPackage,
+  FilingReadinessResult,
+  FilingSubmission,
   ITRDecisionResponse,
   ItrExport,
   ItrExportArtifact,
@@ -317,4 +322,78 @@ export async function downloadItrExportArtifact(exportId: string, artifact: ItrE
     throw new Error(toFriendlyErrorMessage("/v1/itr-exports/artifacts", response.status, errorBody));
   }
   return response.blob();
+}
+
+export function createFilingSubmission(packageId: string, exportId: string): Promise<FilingSubmission> {
+  return postJson<FilingSubmission>("/v1/filing/submissions", { package_id: packageId, export_id: exportId });
+}
+
+export function checkFilingReadiness(submissionId: string): Promise<FilingReadinessResult> {
+  return postJson<FilingReadinessResult>(`/v1/filing/submissions/${submissionId}/readiness`, {});
+}
+
+export function submitFilingSubmission(submissionId: string): Promise<FilingSubmission> {
+  return postJson<FilingSubmission>(`/v1/filing/submissions/${submissionId}/submit`, {});
+}
+
+export function refreshFilingStatus(submissionId: string): Promise<FilingSubmission> {
+  return postJson<FilingSubmission>(`/v1/filing/submissions/${submissionId}/status-check`, {});
+}
+
+export function requestFilingConsent(
+  packageId: string,
+  exportId: string,
+  consentText: string,
+): Promise<FilingConsent> {
+  return postJson<FilingConsent>("/v1/filing/consents/request", {
+    package_id: packageId,
+    export_id: exportId,
+    consent_text: consentText,
+  });
+}
+
+export function grantFilingConsent(consentId: string): Promise<FilingConsent> {
+  return postJson<FilingConsent>(`/v1/filing/consents/${consentId}/grant`, {});
+}
+
+export function revokeFilingConsent(consentId: string): Promise<FilingConsent> {
+  return postJson<FilingConsent>(`/v1/filing/consents/${consentId}/revoke`, {});
+}
+
+export function requestFilingApproval(packageId: string, exportId: string): Promise<FilingApproval> {
+  return postJson<FilingApproval>("/v1/filing/approvals/request", { package_id: packageId, export_id: exportId });
+}
+
+export function approveFilingApproval(approvalId: string): Promise<FilingApproval> {
+  return postJson<FilingApproval>(`/v1/filing/approvals/${approvalId}/approve`, {});
+}
+
+export function rejectFilingApproval(approvalId: string): Promise<FilingApproval> {
+  return postJson<FilingApproval>(`/v1/filing/approvals/${approvalId}/reject`, {});
+}
+
+export function initiateEVerification(submissionId: string): Promise<FilingSubmission> {
+  return postJson<FilingSubmission>(`/v1/filing/submissions/${submissionId}/everification/initiate`, {});
+}
+
+export async function getEVerificationStatus(submissionId: string): Promise<FilingSubmission> {
+  const response = await fetch(`${API_BASE_URL}/v1/filing/submissions/${submissionId}/everification`, {
+    headers: demoAuthHeaders(),
+  });
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(toFriendlyErrorMessage("/v1/filing/submissions/everification", response.status, errorBody));
+  }
+  return (await response.json()) as FilingSubmission;
+}
+
+export async function getAcknowledgement(submissionId: string): Promise<Acknowledgement> {
+  const response = await fetch(`${API_BASE_URL}/v1/filing/submissions/${submissionId}/acknowledgement`, {
+    headers: demoAuthHeaders(),
+  });
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(toFriendlyErrorMessage("/v1/filing/submissions/acknowledgement", response.status, errorBody));
+  }
+  return (await response.json()) as Acknowledgement;
 }

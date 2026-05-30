@@ -24,6 +24,15 @@ from app.models.filing_package import (
     FilingPackageExplainRequest,
     FilingPackageGenerateRequest,
 )
+from app.models.filing_approval import FilingApproval, FilingApprovalAction, FilingApprovalRequest
+from app.models.filing_consent import FilingConsent, FilingConsentAction, FilingConsentRequest, hash_optional
+from app.models.filing_submission import (
+    Acknowledgement,
+    FilingExplainRequest,
+    FilingExplanation,
+    FilingSubmission,
+    FilingSubmissionRequest,
+)
 from app.models.itr_export import (
     ItrExport,
     ItrExportExplainRequest,
@@ -47,6 +56,7 @@ from app.models.validation import (
     ValidationRunRequest,
 )
 from app.agents.filing_agent import FilingAgent
+from app.agents.government_filing_agent import GovernmentFilingAgent
 from app.agents.itr_export_agent import ItrExportAgent
 from app.agents.tax_computation_agent import TaxComputationAgent
 from app.agents.validation_agent import ValidationAgent
@@ -64,6 +74,8 @@ from app.services.document_extraction_service import DocumentExtractionService
 from app.services.document_validation_service import DocumentValidationService
 from app.services.explanation_service import explain_decision
 from app.services.filing_package_service import FilingPackageService
+from app.services.filing_readiness_service import FilingReadinessResult
+from app.services.filing_service import FilingService
 from app.services.itr_export_service import ItrExportService
 from app.services.itr_service import get_missing_fields, run_itr_decision
 from app.services.normalization_service import normalize_raw_user_data
@@ -101,6 +113,14 @@ def _schema_pack_service() -> SchemaPackService:
 
 def _itr_export_service() -> ItrExportService:
     return ItrExportService(repository=itr_export_repository, schema_pack_service=_schema_pack_service())
+
+
+def _filing_service() -> FilingService:
+    return FilingService(
+        package_repository=filing_package_repository,
+        export_repository=itr_export_repository,
+        authorization_service=authorization_service,
+    )
 
 
 OWNER_EXCLUDE = {"owner_user_id", "organization_id", "created_by"}
@@ -750,6 +770,331 @@ def explain_itr_export(
         metadata_summary={"kind": "itr_export"},
     )
     return response
+
+
+def _filing_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, LookupError):
+        return HTTPException(status_code=404, detail=str(exc))
+    if isinstance(exc, PermissionError):
+        return HTTPException(status_code=403, detail="Access denied")
+    return HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/filing/consents/request", response_model=FilingConsent)
+def request_filing_consent(
+    payload: FilingConsentRequest,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> FilingConsent:
+    try:
+        consent = _filing_service().request_consent(
+            package_id=payload.package_id,
+            export_id=payload.export_id,
+            consent_text=payload.consent_text,
+            session=session,
+            ip_hash=hash_optional(request.client.host if request.client else None),
+            user_agent_hash=hash_optional(request.headers.get("user-agent")),
+        )
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+    audit_service.record(
+        event_type="filing_consent_requested",
+        session=session,
+        resource_type="filing_consent",
+        resource_id=consent.consent_id,
+        request=request,
+        metadata_summary={"package_id": consent.package_id, "export_id": consent.export_id},
+    )
+    return consent
+
+
+@router.post("/filing/consents/{consent_id}/grant", response_model=FilingConsent)
+def grant_filing_consent(
+    consent_id: str,
+    _payload: FilingConsentAction,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> FilingConsent:
+    try:
+        consent = _filing_service().grant_consent(consent_id=consent_id, session=session)
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+    audit_service.record(
+        event_type="filing_consent_granted",
+        session=session,
+        resource_type="filing_consent",
+        resource_id=consent.consent_id,
+        request=request,
+        metadata_summary={"package_id": consent.package_id, "export_id": consent.export_id},
+    )
+    return consent
+
+
+@router.post("/filing/consents/{consent_id}/revoke", response_model=FilingConsent)
+def revoke_filing_consent(
+    consent_id: str,
+    _payload: FilingConsentAction,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> FilingConsent:
+    try:
+        consent = _filing_service().revoke_consent(consent_id=consent_id, session=session)
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+    audit_service.record(
+        event_type="filing_consent_revoked",
+        session=session,
+        resource_type="filing_consent",
+        resource_id=consent.consent_id,
+        request=request,
+        metadata_summary={"package_id": consent.package_id, "export_id": consent.export_id},
+    )
+    return consent
+
+
+@router.post("/filing/approvals/request", response_model=FilingApproval)
+def request_filing_approval(
+    payload: FilingApprovalRequest,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> FilingApproval:
+    try:
+        approval = _filing_service().request_approval(
+            package_id=payload.package_id,
+            export_id=payload.export_id,
+            approval_notes=payload.approval_notes,
+            session=session,
+        )
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+    audit_service.record(
+        event_type="filing_approval_requested",
+        session=session,
+        resource_type="filing_approval",
+        resource_id=approval.approval_id,
+        request=request,
+        metadata_summary={"package_id": approval.package_id, "export_id": approval.export_id},
+    )
+    return approval
+
+
+@router.post("/filing/approvals/{approval_id}/approve", response_model=FilingApproval)
+def approve_filing(
+    approval_id: str,
+    payload: FilingApprovalAction,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> FilingApproval:
+    try:
+        approval = _filing_service().approve(
+            approval_id=approval_id,
+            session=session,
+            approval_notes=payload.approval_notes,
+        )
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+    audit_service.record(
+        event_type="filing_approval_approved",
+        session=session,
+        resource_type="filing_approval",
+        resource_id=approval.approval_id,
+        request=request,
+        metadata_summary={"package_id": approval.package_id, "export_id": approval.export_id},
+    )
+    return approval
+
+
+@router.post("/filing/approvals/{approval_id}/reject", response_model=FilingApproval)
+def reject_filing(
+    approval_id: str,
+    payload: FilingApprovalAction,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> FilingApproval:
+    try:
+        approval = _filing_service().reject(
+            approval_id=approval_id,
+            session=session,
+            approval_notes=payload.approval_notes,
+        )
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+    audit_service.record(
+        event_type="filing_approval_rejected",
+        session=session,
+        resource_type="filing_approval",
+        resource_id=approval.approval_id,
+        request=request,
+        metadata_summary={"package_id": approval.package_id, "export_id": approval.export_id},
+    )
+    return approval
+
+
+@router.post("/filing/submissions", response_model=FilingSubmission, response_model_exclude=OWNER_EXCLUDE)
+def create_filing_submission(
+    payload: FilingSubmissionRequest,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> FilingSubmission:
+    try:
+        submission = _filing_service().create_draft(
+            package_id=payload.package_id,
+            export_id=payload.export_id,
+            session=session,
+        )
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+    audit_service.record(
+        event_type="filing_submission_draft_created",
+        session=session,
+        resource_type="filing_submission",
+        resource_id=submission.submission_id,
+        request=request,
+        metadata_summary={"provider_mode": submission.provider_mode},
+    )
+    return submission
+
+
+@router.post("/filing/submissions/{submission_id}/readiness", response_model=FilingReadinessResult)
+def filing_submission_readiness(
+    submission_id: str,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> FilingReadinessResult:
+    try:
+        result = _filing_service().readiness(submission_id=submission_id, session=session)
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+    audit_service.record(
+        event_type="filing_readiness_checked",
+        session=session,
+        resource_type="filing_submission",
+        resource_id=submission_id,
+        request=request,
+        metadata_summary={"ready": result.ready, "provider_mode": result.provider_mode},
+    )
+    return result
+
+
+@router.post("/filing/submissions/{submission_id}/submit", response_model=FilingSubmission, response_model_exclude=OWNER_EXCLUDE)
+def submit_filing_submission(
+    submission_id: str,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> FilingSubmission:
+    try:
+        submission = _filing_service().submit(submission_id=submission_id, session=session)
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+    audit_service.record(
+        event_type="filing_submission_submitted",
+        session=session,
+        resource_type="filing_submission",
+        resource_id=submission.submission_id,
+        request=request,
+        metadata_summary={"provider_mode": submission.provider_mode, "status": submission.submission_status},
+    )
+    return submission
+
+
+@router.get("/filing/submissions/{submission_id}", response_model=FilingSubmission, response_model_exclude=OWNER_EXCLUDE)
+def get_filing_submission(
+    submission_id: str,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> FilingSubmission:
+    try:
+        return _filing_service().get_submission(submission_id=submission_id, session=session)
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+
+
+@router.post("/filing/submissions/{submission_id}/status-check", response_model=FilingSubmission, response_model_exclude=OWNER_EXCLUDE)
+def check_filing_submission_status(
+    submission_id: str,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> FilingSubmission:
+    try:
+        submission = _filing_service().check_status(submission_id=submission_id, session=session)
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+    audit_service.record(
+        event_type="filing_status_checked",
+        session=session,
+        resource_type="filing_submission",
+        resource_id=submission.submission_id,
+        request=request,
+        metadata_summary={"status": submission.submission_status},
+    )
+    return submission
+
+
+@router.post("/filing/submissions/{submission_id}/everification/initiate", response_model=FilingSubmission, response_model_exclude=OWNER_EXCLUDE)
+def initiate_everification(
+    submission_id: str,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> FilingSubmission:
+    try:
+        submission = _filing_service().initiate_everification(submission_id=submission_id, session=session)
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+    audit_service.record(
+        event_type="filing_everification_initiated",
+        session=session,
+        resource_type="filing_submission",
+        resource_id=submission.submission_id,
+        request=request,
+        metadata_summary={"everification_status": submission.everification_status},
+    )
+    return submission
+
+
+@router.get("/filing/submissions/{submission_id}/everification", response_model=FilingSubmission, response_model_exclude=OWNER_EXCLUDE)
+def get_everification_status(
+    submission_id: str,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> FilingSubmission:
+    try:
+        return _filing_service().everification_status(submission_id=submission_id, session=session)
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+
+
+@router.get("/filing/submissions/{submission_id}/acknowledgement", response_model=Acknowledgement)
+def get_acknowledgement(
+    submission_id: str,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> Acknowledgement:
+    try:
+        return _filing_service().acknowledgement(submission_id=submission_id, session=session)
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+
+
+@router.post("/filing/explain", response_model=FilingExplanation)
+def explain_government_filing(
+    payload: FilingExplainRequest,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> FilingExplanation:
+    try:
+        _filing_service().get_submission(submission_id=payload.submission_id, session=session)
+    except Exception as exc:
+        raise _filing_error(exc) from exc
+    explanation = GovernmentFilingAgent().explain_submission(payload.submission_id, session_user_id=session.user_id)
+    audit_service.record(
+        event_type="filing_explanation_generated",
+        session=session,
+        resource_type="filing_submission",
+        resource_id=payload.submission_id,
+        request=request,
+        metadata_summary={"kind": "filing"},
+    )
+    return explanation
 
 
 @router.post("/itr-decision", response_model=ITRDecisionResponse)

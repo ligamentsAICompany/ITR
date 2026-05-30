@@ -20,6 +20,10 @@ SQLITE_TABLES = {
     "schema_pack_contents",
     "itr_exports",
     "itr_export_artifacts",
+    "filing_consents",
+    "filing_approvals",
+    "filing_submissions",
+    "filing_acknowledgements",
     "audit_events",
 }
 

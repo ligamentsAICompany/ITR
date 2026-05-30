@@ -341,3 +341,83 @@ export type ItrExport = {
   created_at: string;
   updated_at: string;
 };
+
+export type ProviderMode = "mock" | "sandbox" | "live";
+export type ConsentStatus = "not_requested" | "requested" | "granted" | "revoked" | "expired";
+export type ApprovalStatus = "not_required" | "pending" | "approved" | "rejected";
+export type SubmissionStatus =
+  | "draft"
+  | "blocked"
+  | "ready"
+  | "submitted"
+  | "submission_failed"
+  | "pending_verification"
+  | "verified"
+  | "acknowledgement_available"
+  | "cancelled";
+export type EVerificationStatus = "not_started" | "initiated" | "pending" | "verified" | "failed" | "expired";
+
+export type FilingReadinessResult = {
+  ready: boolean;
+  blockers: string[];
+  warnings: string[];
+  required_actions: string[];
+  provider: ProviderMode;
+  provider_mode: ProviderMode;
+};
+
+export type FilingConsent = {
+  consent_id: string;
+  user_id: string;
+  organization_id: string;
+  package_id: string;
+  export_id: string;
+  consent_status: ConsentStatus;
+  consent_text: string;
+  granted_at?: string | null;
+  revoked_at?: string | null;
+  expires_at?: string | null;
+  ip_hash?: string | null;
+  user_agent_hash?: string | null;
+  created_at: string;
+};
+
+export type FilingApproval = {
+  approval_id: string;
+  package_id: string;
+  export_id: string;
+  approver_user_id?: string | null;
+  organization_id: string;
+  approval_status: ApprovalStatus;
+  approval_notes?: string | null;
+  approved_at?: string | null;
+  rejected_at?: string | null;
+  created_at: string;
+};
+
+export type FilingSubmission = {
+  submission_id: string;
+  package_id: string;
+  export_id: string;
+  provider: string;
+  provider_mode: ProviderMode;
+  submission_status: SubmissionStatus;
+  everification_status: EVerificationStatus;
+  provider_reference_id?: string | null;
+  submitted_at?: string | null;
+  last_checked_at?: string | null;
+  failure_reason?: string | null;
+  acknowledgement_id?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Acknowledgement = {
+  acknowledgement_id: string;
+  submission_id: string;
+  provider_reference_id: string;
+  acknowledgement_number: string;
+  acknowledgement_date: string;
+  artifact_id?: string | null;
+  created_at: string;
+};
