@@ -855,7 +855,11 @@ async def provider_callback(provider: str, request: Request) -> ProviderCallback
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=400, detail="Provider callback payload is invalid") from exc
     provider_status = str(payload.get("provider_status") or payload.get("status") or "status_unknown")
-    mapped_status = ProviderStatusMapper().map_status(provider_status)
+    submission = provider_callback_submission_repository.get_by_provider_reference(str(payload.get("provider_reference_id") or ""))
+    mapped_status = ProviderStatusMapper().map_status(
+        provider_status,
+        current_status=submission.submission_status if submission is not None else None,
+    )
     event = ProviderCallbackEvent(
         callback_id=str(payload.get("callback_id") or payload.get("event_id") or "00000000-0000-4000-8000-000000000000"),
         provider=provider,
@@ -865,8 +869,7 @@ async def provider_callback(provider: str, request: Request) -> ProviderCallback
         provider_status=provider_status,
         normalized_status=mapped_status.normalized_status,
     )
-    submission = provider_callback_submission_repository.get_by_provider_reference(event.provider_reference_id)
-    if submission is not None and event.normalized_status is not None:
+    if submission is not None and event.normalized_status is not None and mapped_status.transition_valid:
         submission.submission_status = event.normalized_status
         submission.last_checked_at = event.received_at
         submission.updated_at = event.received_at

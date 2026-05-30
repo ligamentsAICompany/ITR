@@ -191,6 +191,36 @@ def test_callback_invalid_missing_and_replayed_signatures_are_rejected(monkeypat
     assert "raw" not in accepted.text.lower()
 
 
+def test_callback_invalid_status_transition_does_not_corrupt_submission(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("AUTH_MODE", "demo")
+    monkeypatch.setenv("ALLOW_DEMO_AUTH_IN_PRODUCTION", "true")
+    monkeypatch.setenv("API_BASE_URL", "https://api.example.com")
+    monkeypatch.setenv("NEXT_PUBLIC_API_BASE_URL", "https://app.example.com")
+    monkeypatch.setenv("ERI_CLIENT_SECRET", "callback-secret")
+    get_settings.cache_clear()
+    submission = FilingSubmission(
+        package_id="pkg-callback",
+        export_id="exp-callback",
+        provider_reference_id="ERI-CB-DRAFT",
+        submission_status=SubmissionStatus.DRAFT,
+    )
+    FILING_SUBMISSION_CACHE[submission.submission_id] = submission
+    payload = {"callback_id": "cb-draft", "provider_reference_id": "ERI-CB-DRAFT", "provider_status": "verified"}
+    body = json.dumps(payload, separators=(",", ":")).encode()
+    signature = hmac.new(b"callback-secret", body, hashlib.sha256).hexdigest()
+
+    response = client.post(
+        "/v1/filing/provider-callbacks/eri_sandbox",
+        content=body,
+        headers={"Content-Type": "application/json", "X-Provider-Signature": f"sha256={signature}"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["normalized_status"] == "verified"
+    assert FILING_SUBMISSION_CACHE[submission.submission_id].submission_status == SubmissionStatus.DRAFT
+
+
 def test_retry_policy_retries_only_retryable_errors_and_maps_safe_failures():
     attempts = {"rate": 0, "invalid": 0}
 
