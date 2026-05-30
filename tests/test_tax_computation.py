@@ -222,6 +222,39 @@ def test_special_rate_capital_gains_are_included_and_warned_when_detail_not_supp
     assert any(warning.code == "SPECIAL_RATE_CAPITAL_GAINS_NOT_COMPUTED" for warning in result.warnings)
 
 
+def test_special_rate_subtype_does_not_create_extra_capital_gains():
+    result = compute(
+        income_heads={
+            "capital_gains": {
+                "has_income": "yes",
+                "gross_amount": 150000,
+                "has_ltcg_112a": "yes",
+                "ltcg_112a_amount": 150000,
+                "has_special_rate_capital_gains": "yes",
+            }
+        }
+    )
+
+    assert result.income.capital_gains_income == 150000
+    assert result.income.capital_gains_subtypes["ltcg_112a"] == 150000
+    assert "special_rate" not in result.income.capital_gains_subtypes
+
+
+def test_agricultural_income_is_explicitly_warned_not_silently_taxed():
+    result = compute(
+        income_heads={
+            "other_sources": {
+                "has_income": "yes",
+                "gross_amount": 10000,
+                "agricultural_income_amount": 6000,
+            }
+        }
+    )
+
+    assert result.income.other_sources_income == 10000
+    assert any(warning.code == "AGRICULTURAL_INCOME_NOT_TAX_COMPUTED" for warning in result.warnings)
+
+
 def test_validation_failed_result_is_preview_with_warning():
     report = ValidationReport(
         validation_run_id="validation-failed",

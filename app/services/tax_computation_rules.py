@@ -74,8 +74,7 @@ def compute_income_breakdown(
     }
     known_capital_subtypes = sum(capital_gains_subtypes.values(), ZERO)
     if capital_gains.has_special_rate_capital_gains == "yes":
-        special_rate_amount = capital_gains_income - known_capital_subtypes
-        capital_gains_subtypes["special_rate"] = max(special_rate_amount, capital_gains_income if special_rate_amount <= ZERO else ZERO)
+        capital_gains_subtypes["special_rate"] = max(capital_gains_income - known_capital_subtypes, ZERO)
         warnings.append(
             TaxComputationWarning(
                 code="SPECIAL_RATE_CAPITAL_GAINS_NOT_COMPUTED",
@@ -92,6 +91,14 @@ def compute_income_breakdown(
     )
     if interest_parts > other_sources_income:
         other_sources_income = interest_parts
+
+    if money(income_heads.other_sources.agricultural_income_amount):
+        warnings.append(
+            TaxComputationWarning(
+                code="AGRICULTURAL_INCOME_NOT_TAX_COMPUTED",
+                message="Agricultural income was identified but not included in taxable income in this phase; review the legal treatment before relying on the result.",
+            )
+        )
 
     gross_total_income = round_money(
         salary_gross + house_property_income + business_income + capital_gains_income + other_sources_income
