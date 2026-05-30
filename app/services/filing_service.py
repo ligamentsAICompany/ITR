@@ -178,7 +178,6 @@ class FilingService:
         elif response.success and response.status == "acknowledgement_available":
             submission.submission_status = SubmissionStatus.ACKNOWLEDGEMENT_AVAILABLE
         elif not response.success:
-            submission.submission_status = SubmissionStatus.SUBMISSION_FAILED
             submission.failure_reason = response.failure_reason or "Provider status check failed"
         submission.last_checked_at = datetime.now(UTC)
         submission.updated_at = datetime.now(UTC)

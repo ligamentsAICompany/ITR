@@ -215,6 +215,58 @@ def test_provider_status_polling_updates_submission_and_audits(monkeypatch):
     assert any(event.event_type == "provider_status_checked" for event in AUDIT_EVENT_CACHE.values())
 
 
+def test_provider_status_polling_preserves_state_on_transient_failure(monkeypatch):
+    monkeypatch.setenv("FILING_PROVIDER", "mock")
+    monkeypatch.setenv("FILING_PROVIDER_MODE", "mock")
+    monkeypatch.setenv("MOCK_FILING_OUTCOME", "failure")
+    get_settings.cache_clear()
+
+    package, export = save_package_and_export()
+    submission = FilingSubmission(
+        package_id=package.package_id,
+        export_id=export.export_id,
+        owner_user_id=USER_A,
+        organization_id=ORG_A,
+        provider="mock",
+        provider_mode="mock",
+        provider_reference_id="MOCK-1234",
+        submission_status=SubmissionStatus.SUBMITTED,
+    )
+    FILING_SUBMISSION_CACHE[submission.submission_id] = submission
+
+    updated = ProviderStatusService().poll_submission_status(submission_id=submission.submission_id)
+
+    assert updated.submission_status == SubmissionStatus.SUBMITTED
+    assert updated.failure_reason == "Provider status check failed"
+    assert updated.last_checked_at is not None
+
+
+def test_filing_status_check_preserves_state_on_provider_failure(monkeypatch):
+    monkeypatch.setenv("FILING_PROVIDER", "mock")
+    monkeypatch.setenv("FILING_PROVIDER_MODE", "mock")
+    monkeypatch.setenv("MOCK_FILING_OUTCOME", "failure")
+    get_settings.cache_clear()
+
+    package, export = save_package_and_export()
+    submission = FilingSubmission(
+        package_id=package.package_id,
+        export_id=export.export_id,
+        owner_user_id=USER_A,
+        organization_id=ORG_A,
+        provider="mock",
+        provider_mode="mock",
+        provider_reference_id="MOCK-1234",
+        submission_status=SubmissionStatus.SUBMITTED,
+    )
+    FILING_SUBMISSION_CACHE[submission.submission_id] = submission
+
+    response = client.post(f"/v1/filing/submissions/{submission.submission_id}/status-check", headers=auth(), json={})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["submission_status"] == "submitted"
+    assert response.json()["failure_reason"] == "Provider status check failed"
+
+
 def test_callback_unsigned_rejected_in_production_and_signed_updates_status(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("AUTH_MODE", "demo")
@@ -256,6 +308,16 @@ def test_callback_unsigned_rejected_in_production_and_signed_updates_status(monk
     assert FILING_SUBMISSION_CACHE[submission.submission_id].submission_status == SubmissionStatus.ACKNOWLEDGEMENT_AVAILABLE
     assert "provider_status" in signed.json()
     assert "raw" not in signed.text.lower()
+
+
+def test_callback_rejects_unknown_provider():
+    response = client.post(
+        "/v1/filing/provider-callbacks/unknown_provider",
+        json={"provider_reference_id": "UNKNOWN-123", "provider_status": "submitted"},
+    )
+
+    assert response.status_code == 400
+    assert "Unsupported filing provider callback" in response.text
 
 
 def test_sanitizer_handles_provider_payload_like_text():

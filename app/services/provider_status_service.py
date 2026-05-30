@@ -34,7 +34,6 @@ class ProviderStatusService:
             status = response.normalized_status or _normalize_status(response.status)
             submission.submission_status = status
         else:
-            submission.submission_status = SubmissionStatus.SUBMISSION_FAILED
             submission.failure_reason = response.safe_message or response.failure_reason or "Provider status check failed"
         submission.last_checked_at = datetime.now(UTC)
         submission.updated_at = datetime.now(UTC)

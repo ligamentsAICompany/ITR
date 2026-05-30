@@ -827,6 +827,9 @@ def _audit_provider_callback(event: ProviderCallbackEvent) -> None:
 
 @router.post("/filing/provider-callbacks/{provider}", response_model=ProviderCallbackEvent)
 async def provider_callback(provider: str, request: Request) -> ProviderCallbackEvent:
+    provider = provider.lower()
+    if provider not in {"mock", "eri", "eri_sandbox", "eri_live"}:
+        raise HTTPException(status_code=400, detail="Unsupported filing provider callback")
     body = await request.body()
     verified = _verify_provider_callback_signature(body=body, signature=request.headers.get("X-Provider-Signature"))
     settings = get_settings()
