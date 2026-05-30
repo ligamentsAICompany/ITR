@@ -19,16 +19,21 @@ def load_schema():
 def expected_pydantic_schema():
     schema = CanonicalTaxProfile.model_json_schema()
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
-    schema["$id"] = "canonical-tax-profile/v0.1"
+    schema["$id"] = "canonical-tax-profile/v0.2"
     schema["title"] = "Canonical Tax Profile"
     return schema
 
 
 def valid_payload(**overrides):
     payload = {
-        "schema_version": "canonical-tax-profile/v0.1",
+        "schema_version": "canonical-tax-profile/v0.2",
         "assessment_year": "2026-27",
         "previous_year": "2025-26",
+        "taxpayer_master": {
+            "full_name": "Tax Payer",
+            "email": "taxpayer@example.com",
+            "mobile": "9999999999",
+        },
         "return_filing_reason": {"type": "voluntary"},
         "is_defective_return_case": "no",
         "user_identity": {
@@ -46,7 +51,10 @@ def valid_payload(**overrides):
                 "has_income": "yes",
                 "gross_amount": 1200000,
                 "employer_count": 1,
+                "employer_name": "Example Pvt Ltd",
                 "has_pension_income": "no",
+                "standard_deduction": 50000,
+                "professional_tax": 2400,
             },
             "house_property": {
                 "has_income": "yes",
@@ -54,6 +62,8 @@ def valid_payload(**overrides):
                 "property_count": 1,
                 "has_self_occupied_property": "yes",
                 "has_let_out_property": "no",
+                "annual_value": 0,
+                "interest_on_housing_loan": 0,
             },
             "capital_gains": {
                 "has_income": "yes",
@@ -64,6 +74,8 @@ def valid_payload(**overrides):
                 "has_stcg": "no",
                 "has_ltcg_112a": "yes",
                 "ltcg_112a_amount": 100000,
+                "stcg_amount": 0,
+                "other_ltcg_amount": 0,
                 "has_other_ltcg": "no",
                 "has_land_or_building_gains": "no",
                 "has_land_building_gains": "no",
@@ -82,7 +94,11 @@ def valid_payload(**overrides):
                 "has_income": "yes",
                 "gross_amount": 45000,
                 "has_interest_income": "yes",
+                "interest_savings_amount": 4200,
+                "interest_fixed_deposit_amount": 25000,
+                "interest_other_amount": 0,
                 "has_dividend_income": "yes",
+                "dividend_amount": 15800,
                 "has_winnings_or_lottery_income": "no",
                 "agricultural_income_amount": 3000,
             },
@@ -90,6 +106,27 @@ def valid_payload(**overrides):
         "deductions": {
             "has_deductions": "yes",
             "section_claims": [{"section_code": "80C", "amount": 150000}],
+            "section_80c_amount": 150000,
+            "section_80d_amount": 25000,
+            "section_80g_amount": 0,
+            "nps_80ccd1b_amount": 0,
+        },
+        "tax_payments": {
+            "tds_salary": 125000,
+            "tds_other": 500,
+            "tcs": 0,
+            "advance_tax": 0,
+            "self_assessment_tax": 0,
+        },
+        "evidence_summary": {
+            "documents": [
+                {
+                    "document_id": "doc-1",
+                    "document_type": "form16",
+                    "sha256": "abc123",
+                    "field_paths": ["income_heads.salary.gross_amount"],
+                }
+            ]
         },
         "foreign_assets": {
             "has_foreign_assets": "no",
@@ -142,6 +179,12 @@ def test_valid_canonical_payload_passes_schema_and_backend_validation():
 
     Draft202012Validator(load_schema()).validate(payload)
     assert CanonicalTaxProfile.model_validate(payload).model_dump(mode="json") == payload
+
+
+def test_v01_payload_still_validates_for_existing_classifier_callers():
+    payload = valid_payload(schema_version="canonical-tax-profile/v0.1")
+
+    assert CanonicalTaxProfile.model_validate(payload).schema_version == "canonical-tax-profile/v0.1"
 
 
 def test_invalid_nested_extra_field_fails_schema_and_backend_validation():

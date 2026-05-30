@@ -29,9 +29,14 @@ def normalize_raw_user_data(raw_data: dict[str, Any]) -> CanonicalTaxProfile:
     )
 
     profile = {
-        "schema_version": "canonical-tax-profile/v0.1",
+        "schema_version": raw_data.get("schema_version", "canonical-tax-profile/v0.2"),
         "assessment_year": raw_data.get("assessment_year", "2026-27"),
         "previous_year": raw_data.get("previous_year"),
+        "taxpayer_master": {
+            "full_name": raw_data.get("taxpayer_name"),
+            "email": raw_data.get("taxpayer_email"),
+            "mobile": raw_data.get("taxpayer_mobile"),
+        },
         "return_filing_reason": {
             "type": raw_data.get("return_filing_reason", "unknown"),
         },
@@ -63,12 +68,17 @@ def normalize_raw_user_data(raw_data: dict[str, Any]) -> CanonicalTaxProfile:
             "capital_gains": {
                 **_income_head(capital_gains_income),
                 "has_stcg": raw_data.get("has_stcg", "no"),
+                "stcg_amount": _number(raw_data.get("stcg_amount", 0), ("stcg_amount",)),
                 "has_ltcg_112a": raw_data.get(
                     "has_ltcg_112a",
                     "yes" if ltcg_112a_amount > 0 else "no",
                 ),
                 "ltcg_112a_amount": ltcg_112a_amount,
                 "has_other_ltcg": raw_data.get("has_other_ltcg", "no"),
+                "other_ltcg_amount": _number(
+                    raw_data.get("other_ltcg_amount", 0),
+                    ("other_ltcg_amount",),
+                ),
                 "has_land_or_building_gains": raw_data.get("has_land_building_gains", "no"),
                 "has_land_building_gains": raw_data.get("has_land_building_gains", "no"),
                 "has_special_rate_capital_gains": raw_data.get(
@@ -85,9 +95,22 @@ def normalize_raw_user_data(raw_data: dict[str, Any]) -> CanonicalTaxProfile:
                     "has_interest_income",
                     "yes" if other_income > 0 else "no",
                 ),
+                "interest_savings_amount": _number(
+                    raw_data.get("interest_savings_amount", raw_data.get("other_sources_interest", 0)),
+                    ("interest_savings_amount",),
+                ),
+                "interest_fixed_deposit_amount": _number(
+                    raw_data.get("interest_fixed_deposit_amount", 0),
+                    ("interest_fixed_deposit_amount",),
+                ),
+                "interest_other_amount": _number(
+                    raw_data.get("interest_other_amount", 0),
+                    ("interest_other_amount",),
+                ),
                 "has_winnings_or_lottery_income": raw_data.get(
                     "has_winnings_or_lottery_income", "no"
                 ),
+                "dividend_amount": _number(raw_data.get("dividend_amount", 0), ("dividend_amount",)),
                 "agricultural_income_amount": _number(
                     raw_data.get("agricultural_income_amount", 0),
                     ("agricultural_income_amount",),
@@ -97,6 +120,29 @@ def normalize_raw_user_data(raw_data: dict[str, Any]) -> CanonicalTaxProfile:
         "deductions": {
             "has_deductions": raw_data.get("has_deductions", "unknown"),
             "section_claims": _normalize_section_claims(raw_data.get("section_claims", [])),
+            "section_80c_amount": _number(
+                raw_data.get("section_80c_amount", raw_data.get("deduction_80c_amount", 0)),
+                ("section_80c_amount",),
+            ),
+            "section_80d_amount": _number(
+                raw_data.get("section_80d_amount", raw_data.get("deduction_80d_amount", 0)),
+                ("section_80d_amount",),
+            ),
+            "section_80g_amount": _number(raw_data.get("section_80g_amount", 0), ("section_80g_amount",)),
+            "nps_80ccd1b_amount": _number(
+                raw_data.get("nps_80ccd1b_amount", 0),
+                ("nps_80ccd1b_amount",),
+            ),
+        },
+        "tax_payments": {
+            "tds_salary": _number(raw_data.get("tds_salary", 0), ("tds_salary",)),
+            "tds_other": _number(raw_data.get("tds_other", 0), ("tds_other",)),
+            "tcs": _number(raw_data.get("tcs", 0), ("tcs",)),
+            "advance_tax": _number(raw_data.get("advance_tax", 0), ("advance_tax",)),
+            "self_assessment_tax": _number(
+                raw_data.get("self_assessment_tax", 0),
+                ("self_assessment_tax",),
+            ),
         },
         "foreign_assets": {
             "has_foreign_assets": raw_data.get("has_foreign_assets", "unknown"),
@@ -125,7 +171,32 @@ def normalize_raw_user_data(raw_data: dict[str, Any]) -> CanonicalTaxProfile:
             "low_confidence_extraction": raw_data.get("low_confidence_extraction", "unknown"),
             "pack_resolution_conflict": raw_data.get("pack_resolution_conflict", "unknown"),
         },
+        "evidence_summary": {
+            "documents": raw_data.get("evidence_documents", []),
+        },
     }
+    profile["income_heads"]["salary"].update(
+        {
+            "employer_name": raw_data.get("employer_name"),
+            "standard_deduction": _number(
+                raw_data.get("standard_deduction", 0),
+                ("standard_deduction",),
+            ),
+            "professional_tax": _number(
+                raw_data.get("professional_tax", 0),
+                ("professional_tax",),
+            ),
+        }
+    )
+    profile["income_heads"]["house_property"].update(
+        {
+            "annual_value": _number(raw_data.get("house_property_annual_value", 0), ("house_property_annual_value",)),
+            "interest_on_housing_loan": _number(
+                raw_data.get("house_property_interest", 0),
+                ("house_property_interest",),
+            ),
+        }
+    )
     return CanonicalTaxProfile.model_validate(profile)
 
 

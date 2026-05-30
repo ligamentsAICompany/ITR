@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import { AgentPanel } from "@/components/AgentPanel";
 import { DecisionCard } from "@/components/DecisionCard";
+import { DocumentUploadCenter } from "@/components/DocumentUploadCenter";
 import { EscalationAlert } from "@/components/EscalationAlert";
+import { ExtractionReviewPanel } from "@/components/ExtractionReviewPanel";
 import { IntakeForm } from "@/components/IntakeForm";
 import { Navbar } from "@/components/Navbar";
 import { Spinner } from "@/components/Spinner";
@@ -13,6 +15,8 @@ import {
   getDecision,
   getExplanation,
   getMissingFields,
+  applyMergedPayloadToForm,
+  mergeExtractionFields,
   normalizeProfile,
 } from "@/lib/api";
 import { validateAadhaar } from "@/lib/aadhaar";
@@ -22,6 +26,8 @@ import type {
   BasicFormState,
   CanonicalTaxProfile,
   ClarificationResponse,
+  DocumentRecord,
+  ExtractionResult,
   ExplanationResponse,
   ITRDecisionResponse,
 } from "@/types/itr";
@@ -31,9 +37,14 @@ const highRiskFields = ["foreign_assets", "business_profession", "capital_gains"
 const initialForm: BasicFormState = {
   pan: "ABCDE1234F",
   aadhaar: "",
+  taxpayerName: "",
   entityType: "individual",
   residency: "resident",
   salaryIncome: "1200000",
+  employerName: "",
+  grossSalary: "1200000",
+  standardDeduction: "",
+  professionalTax: "",
   housePropertyHasIncome: "no",
   housePropertyIncome: "0",
   housePropertyCount: "0",
@@ -44,11 +55,20 @@ const initialForm: BasicFormState = {
   hasStcg: "no",
   hasLtcg112A: "no",
   ltcg112AAmount: "0",
+  stcgAmount: "",
+  otherLtcgAmount: "",
   hasOtherLtcg: "no",
   hasLandBuildingGains: "no",
   hasSpecialRateCapitalGains: "no",
   otherSourcesIncome: "0",
+  otherSourcesInterest: "0",
+  savingsInterest: "",
+  fixedDepositInterest: "",
   agriculturalIncome: "0",
+  housePropertyInterest: "",
+  tdsSalary: "",
+  tdsOther: "",
+  tcs: "",
   previousYear: "2025-26",
   returnFilingReason: "voluntary",
   isDefectiveReturnCase: "no",
@@ -79,6 +99,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [unresolvedFields, setUnresolvedFields] = useState<string[]>([]);
+  const [uploadedDocument, setUploadedDocument] = useState<DocumentRecord | null>(null);
+  const [extraction, setExtraction] = useState<ExtractionResult | null>(null);
 
   const questions = useMemo(
     () => (clarification?.question ? [clarification.question] : []),
@@ -96,6 +118,31 @@ export default function Home() {
 
   function pushLog(message: string) {
     setLogs((current) => [...current, message]);
+  }
+
+  function handleExtraction(document: DocumentRecord, extractionResult: ExtractionResult) {
+    setUploadedDocument(document);
+    setExtraction(extractionResult);
+    pushLog(`extract: ${extractionResult.fields.length} candidate field(s) ready for review`);
+  }
+
+  async function acceptExtractedFields(fieldIds: string[]) {
+    if (!extraction) {
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      pushLog("merge: POST /v1/intake/merge-extractions");
+      const mergeResult = await mergeExtractionFields(form, extraction, fieldIds);
+      const nextForm = normalizeDocumentMerge(applyMergedPayloadToForm(form, mergeResult.merged_payload));
+      setForm(nextForm);
+      pushLog(`merge: accepted ${mergeResult.applied_field_ids.length} reviewed field(s)`);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Could not merge extracted fields.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function runWorkflow(nextForm = form, options: { resetLogs?: boolean; unresolvedFields?: string[] } = {}) {
@@ -237,6 +284,19 @@ export default function Home() {
         </section>
 
         <div className="space-y-6">
+          <DocumentUploadCenter
+            disabled={loading}
+            onExtracted={handleExtraction}
+            onLog={pushLog}
+            onError={(message) => setError(message || null)}
+          />
+          <ExtractionReviewPanel
+            document={uploadedDocument}
+            extraction={extraction}
+            disabled={loading}
+            onAccept={(fieldIds) => void acceptExtractedFields(fieldIds)}
+          />
+
           <IntakeForm
             form={form}
             missingFields={missingFields}
@@ -289,6 +349,25 @@ export default function Home() {
       </div>
     </main>
   );
+}
+
+function normalizeDocumentMerge(form: BasicFormState): BasicFormState {
+  const nextForm = { ...form };
+  if (Number(nextForm.deduction80CAmount || 0) > 0) {
+    nextForm.has80C = "yes";
+    nextForm.hasDeductions = "yes";
+  }
+  if (Number(nextForm.deduction80DAmount || 0) > 0) {
+    nextForm.has80D = "yes";
+    nextForm.hasDeductions = "yes";
+  }
+  if (Number(nextForm.otherSourcesInterest || 0) > 0 && Number(nextForm.otherSourcesIncome || 0) === 0) {
+    nextForm.otherSourcesIncome = nextForm.otherSourcesInterest;
+  }
+  if (Number(nextForm.salaryIncome || 0) === 0 && Number(nextForm.grossSalary || 0) > 0) {
+    nextForm.salaryIncome = nextForm.grossSalary;
+  }
+  return nextForm;
 }
 
 function normalizeYesNo(value: string): "yes" | "no" | "unknown" {

@@ -2,8 +2,12 @@ import type {
   BasicFormState,
   CanonicalTaxProfile,
   ClarificationResponse,
+  DocumentRecord,
+  DocumentType,
+  ExtractionResult,
   ExplanationResponse,
   ITRDecisionResponse,
+  MergeExtractionResult,
 } from "@/types/itr";
 import { normalizeAadhaar } from "./aadhaar";
 
@@ -40,9 +44,13 @@ export function normalizeProfile(form: BasicFormState): Promise<CanonicalTaxProf
     aadhaar_number: aadhaarNumber || undefined,
     assessment_year: "2026-27",
     previous_year: form.previousYear || undefined,
+    taxpayer_name: form.taxpayerName || undefined,
     entity_type: form.entityType,
     residency_status: form.residency,
     salary_income: Number(form.salaryIncome || 0),
+    employer_name: form.employerName || undefined,
+    standard_deduction: Number(form.standardDeduction || 0),
+    professional_tax: Number(form.professionalTax || 0),
     house_property_has_income: form.housePropertyHasIncome,
     house_property_income: Number(form.housePropertyIncome || 0),
     house_property_count:
@@ -59,8 +67,17 @@ export function normalizeProfile(form: BasicFormState): Promise<CanonicalTaxProf
     has_other_ltcg: form.hasOtherLtcg,
     has_land_building_gains: form.hasLandBuildingGains,
     has_special_rate_capital_gains: form.hasSpecialRateCapitalGains,
+    stcg_amount: Number(form.stcgAmount || 0),
+    other_ltcg_amount: Number(form.otherLtcgAmount || 0),
     other_sources_income: Number(form.otherSourcesIncome || 0),
+    other_sources_interest: Number(form.otherSourcesInterest || 0),
+    interest_savings_amount: Number(form.savingsInterest || form.otherSourcesInterest || 0),
+    interest_fixed_deposit_amount: Number(form.fixedDepositInterest || 0),
+    house_property_interest: Number(form.housePropertyInterest || 0),
     agricultural_income_amount: Number(form.agriculturalIncome || 0),
+    tds_salary: Number(form.tdsSalary || 0),
+    tds_other: Number(form.tdsOther || 0),
+    tcs: Number(form.tcs || 0),
     return_filing_reason: form.returnFilingReason,
     is_defective_return_case: form.isDefectiveReturnCase,
     has_foreign_assets: form.hasForeignAssets,
@@ -77,6 +94,53 @@ export function normalizeProfile(form: BasicFormState): Promise<CanonicalTaxProf
     ],
     has_deductions: form.has80C === "yes" || form.has80D === "yes" ? "yes" : form.hasDeductions,
   });
+}
+
+export async function uploadDocument(file: File, documentType: DocumentType): Promise<DocumentRecord> {
+  const formData = new FormData();
+  formData.append("document_type", documentType);
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/v1/uploads`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(toFriendlyErrorMessage("/v1/uploads", response.status, errorBody));
+  }
+
+  return (await response.json()) as DocumentRecord;
+}
+
+export function extractDocument(documentId: string): Promise<ExtractionResult> {
+  return postJson<ExtractionResult>(`/v1/uploads/${documentId}/extract`, {});
+}
+
+export function mergeExtractionFields(
+  currentPayload: BasicFormState,
+  extractionResult: ExtractionResult,
+  approvedFieldIds: string[],
+): Promise<MergeExtractionResult> {
+  return postJson<MergeExtractionResult>("/v1/intake/merge-extractions", {
+    current_payload: currentPayload,
+    extraction_result: extractionResult,
+    approved_field_ids: approvedFieldIds,
+  });
+}
+
+export function applyMergedPayloadToForm(
+  currentForm: BasicFormState,
+  mergedPayload: Record<string, unknown>,
+): BasicFormState {
+  const nextForm = { ...currentForm } as Record<string, string>;
+  for (const [key, value] of Object.entries(mergedPayload)) {
+    if (key in nextForm) {
+      nextForm[key] = String(value);
+    }
+  }
+  return nextForm as BasicFormState;
 }
 
 function toFriendlyErrorMessage(path: string, status: number, rawBody: string): string {

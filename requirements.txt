@@ -4,3 +4,7 @@ pydantic
 jsonschema
 httpx
 langgraph
+python-multipart
+pandas
+openpyxl
+pdfplumber

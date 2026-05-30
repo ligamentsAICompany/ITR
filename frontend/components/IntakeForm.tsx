@@ -52,6 +52,13 @@ export function IntakeForm({
       <div className="grid gap-5 sm:grid-cols-2">
         <TextInput label="PAN" value={form.pan} disabled={disabled} onChange={(value) => onChange("pan", value)} />
         <TextInput
+          label="Taxpayer Name"
+          value={form.taxpayerName}
+          disabled={disabled}
+          placeholder="Optional, from documents"
+          onChange={(value) => onChange("taxpayerName", value)}
+        />
+        <TextInput
           label="Aadhaar"
           value={form.aadhaar}
           disabled={disabled}
@@ -95,6 +102,27 @@ export function IntakeForm({
           inputMode="numeric"
           onChange={(value) => onChange("salaryIncome", value)}
         />
+        <TextInput
+          label="Employer Name"
+          value={form.employerName}
+          disabled={disabled}
+          placeholder="Optional, from Form 16"
+          onChange={(value) => onChange("employerName", value)}
+        />
+        <TextInput
+          label="Standard Deduction"
+          value={form.standardDeduction}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("standardDeduction", value)}
+        />
+        <TextInput
+          label="Professional Tax"
+          value={form.professionalTax}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("professionalTax", value)}
+        />
         <YesNoInput
           label="House Property Income / Details"
           value={form.housePropertyHasIncome}
@@ -111,6 +139,14 @@ export function IntakeForm({
               placeholder="Example: 0 for self-occupied property"
               helpText="Use 0 when details exist but there is no taxable house-property amount."
               onChange={(value) => onChange("housePropertyIncome", value)}
+            />
+            <TextInput
+              label="Housing Loan Interest"
+              value={form.housePropertyInterest}
+              disabled={disabled}
+              inputMode="numeric"
+              helpText="Optional document-derived detail for the canonical profile."
+              onChange={(value) => onChange("housePropertyInterest", value)}
             />
             <TextInput
               label="Number of House Properties"
@@ -171,6 +207,20 @@ export function IntakeForm({
           helpText="Use 0 if section 112A does not apply."
           onChange={(value) => onChange("ltcg112AAmount", value)}
         />
+        <TextInput
+          label="STCG Amount"
+          value={form.stcgAmount}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("stcgAmount", value)}
+        />
+        <TextInput
+          label="Other LTCG Amount"
+          value={form.otherLtcgAmount}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("otherLtcgAmount", value)}
+        />
         <YesNoInput
           label="Other LTCG"
           value={form.hasOtherLtcg}
@@ -196,6 +246,49 @@ export function IntakeForm({
           inputMode="numeric"
           helpText="Use this for bank interest and similar income."
           onChange={(value) => onChange("otherSourcesIncome", value)}
+        />
+        <TextInput
+          label="Extracted Interest Detail"
+          value={form.otherSourcesInterest}
+          disabled={disabled}
+          inputMode="numeric"
+          helpText="Accepted bank/AIS interest can populate this before normalization."
+          onChange={(value) => onChange("otherSourcesInterest", value)}
+        />
+        <TextInput
+          label="Savings Interest"
+          value={form.savingsInterest}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("savingsInterest", value)}
+        />
+        <TextInput
+          label="Fixed Deposit Interest"
+          value={form.fixedDepositInterest}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("fixedDepositInterest", value)}
+        />
+        <TextInput
+          label="TDS Salary"
+          value={form.tdsSalary}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("tdsSalary", value)}
+        />
+        <TextInput
+          label="TDS Other"
+          value={form.tdsOther}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("tdsOther", value)}
+        />
+        <TextInput
+          label="TCS"
+          value={form.tcs}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("tcs", value)}
         />
         <TextInput
           label="Agricultural Income"

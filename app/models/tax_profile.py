@@ -40,6 +40,12 @@ class UserIdentity(StrictModel):
     aadhaar_last4: str | None = Field(default=None, pattern=r"^[0-9]{4}$")
 
 
+class TaxpayerMaster(StrictModel):
+    full_name: str | None = None
+    email: str | None = None
+    mobile: str | None = None
+
+
 class ReturnFilingReason(StrictModel):
     type: ReturnFilingReasonType = "unknown"
 
@@ -56,13 +62,18 @@ class IncomeHead(StrictModel):
 
 class SalaryIncome(IncomeHead):
     employer_count: int | None = Field(default=None, ge=0)
+    employer_name: str | None = None
     has_pension_income: YesNoUnknown | None = None
+    standard_deduction: float | None = Field(default=None, ge=0)
+    professional_tax: float | None = Field(default=None, ge=0)
 
 
 class HousePropertyIncome(IncomeHead):
     property_count: int | None = Field(default=None, ge=0)
     has_self_occupied_property: YesNoUnknown | None = None
     has_let_out_property: YesNoUnknown | None = None
+    annual_value: float | None = Field(default=None, ge=0)
+    interest_on_housing_loan: float | None = Field(default=None, ge=0)
 
 
 class CapitalGainsIncome(IncomeHead):
@@ -70,9 +81,11 @@ class CapitalGainsIncome(IncomeHead):
     has_long_term_gains: YesNoUnknown | None = None
     has_equity_or_mutual_fund_gains: YesNoUnknown | None = None
     has_stcg: YesNoUnknown | None = None
+    stcg_amount: float | None = Field(default=None, ge=0)
     has_ltcg_112a: YesNoUnknown | None = None
     ltcg_112a_amount: float | None = Field(default=None, ge=0)
     has_other_ltcg: YesNoUnknown | None = None
+    other_ltcg_amount: float | None = Field(default=None, ge=0)
     has_land_or_building_gains: YesNoUnknown | None = None
     has_land_building_gains: YesNoUnknown | None = None
     has_special_rate_capital_gains: YesNoUnknown | None = None
@@ -88,7 +101,11 @@ class BusinessProfessionIncome(IncomeHead):
 
 class OtherSourcesIncome(IncomeHead):
     has_interest_income: YesNoUnknown | None = None
+    interest_savings_amount: float | None = Field(default=None, ge=0)
+    interest_fixed_deposit_amount: float | None = Field(default=None, ge=0)
+    interest_other_amount: float | None = Field(default=None, ge=0)
     has_dividend_income: YesNoUnknown | None = None
+    dividend_amount: float | None = Field(default=None, ge=0)
     has_winnings_or_lottery_income: YesNoUnknown | None = None
     agricultural_income_amount: float | None = Field(default=None, ge=0)
 
@@ -109,6 +126,29 @@ class DeductionClaim(StrictModel):
 class Deductions(StrictModel):
     has_deductions: YesNoUnknown
     section_claims: list[DeductionClaim] = Field(default_factory=list)
+    section_80c_amount: float | None = Field(default=None, ge=0)
+    section_80d_amount: float | None = Field(default=None, ge=0)
+    section_80g_amount: float | None = Field(default=None, ge=0)
+    nps_80ccd1b_amount: float | None = Field(default=None, ge=0)
+
+
+class TaxPayments(StrictModel):
+    tds_salary: float | None = Field(default=None, ge=0)
+    tds_other: float | None = Field(default=None, ge=0)
+    tcs: float | None = Field(default=None, ge=0)
+    advance_tax: float | None = Field(default=None, ge=0)
+    self_assessment_tax: float | None = Field(default=None, ge=0)
+
+
+class EvidenceDocument(StrictModel):
+    document_id: str
+    document_type: str
+    sha256: str
+    field_paths: list[str] = Field(default_factory=list)
+
+
+class EvidenceSummary(StrictModel):
+    documents: list[EvidenceDocument] = Field(default_factory=list)
 
 
 class ForeignAssets(StrictModel):
@@ -139,9 +179,10 @@ class SpecialConditions(StrictModel):
 
 
 class CanonicalTaxProfile(StrictModel):
-    schema_version: Literal["canonical-tax-profile/v0.1"]
+    schema_version: Literal["canonical-tax-profile/v0.1", "canonical-tax-profile/v0.2"]
     assessment_year: str = Field(pattern=r"^20\d{2}-\d{2}$")
     previous_year: str | None = Field(default=None, pattern=r"^20\d{2}-\d{2}$")
+    taxpayer_master: TaxpayerMaster = Field(default_factory=TaxpayerMaster)
     return_filing_reason: ReturnFilingReason = Field(default_factory=ReturnFilingReason)
     is_defective_return_case: YesNoUnknown = "unknown"
     user_identity: UserIdentity
@@ -149,6 +190,8 @@ class CanonicalTaxProfile(StrictModel):
     residency_status: ResidencyStatus
     income_heads: IncomeHeads
     deductions: Deductions
+    tax_payments: TaxPayments = Field(default_factory=TaxPayments)
     foreign_assets: ForeignAssets
     exemptions_flags: ExemptionsFlags
     special_conditions: SpecialConditions
+    evidence_summary: EvidenceSummary = Field(default_factory=EvidenceSummary)

@@ -10,6 +10,8 @@ class Settings:
     environment: str
     rate_limit_per_minute: int
     max_request_bytes: int
+    document_storage_dir: str
+    max_upload_bytes: int
     cors_allowed_origins: list[str]
 
     def __init__(self) -> None:
@@ -18,6 +20,8 @@ class Settings:
         self.environment = getenv("ENVIRONMENT", "development")
         self.rate_limit_per_minute = int(getenv("RATE_LIMIT_PER_MINUTE", "120"))
         self.max_request_bytes = int(getenv("MAX_REQUEST_BYTES", "1048576"))
+        self.document_storage_dir = getenv("DOCUMENT_STORAGE_DIR", ".local_uploads")
+        self.max_upload_bytes = int(getenv("MAX_UPLOAD_BYTES", "10485760"))
         self.cors_allowed_origins = _csv(
             getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
         )

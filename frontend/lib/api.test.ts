@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
-import { normalizeProfile } from "./api";
-import type { BasicFormState } from "../types/itr";
+import {
+  applyMergedPayloadToForm,
+  extractDocument,
+  mergeExtractionFields,
+  normalizeProfile,
+  uploadDocument,
+} from "./api";
+import type { BasicFormState, ExtractionResult } from "../types/itr";
 
 const baseForm: BasicFormState = {
   pan: "ABCDE1234F",
@@ -40,6 +46,20 @@ const baseForm: BasicFormState = {
   deduction80CAmount: "",
   has80D: "no",
   deduction80DAmount: "",
+  taxpayerName: "",
+  employerName: "",
+  grossSalary: "1200000",
+  standardDeduction: "",
+  professionalTax: "",
+  tdsSalary: "",
+  tdsOther: "",
+  tcs: "",
+  otherSourcesInterest: "0",
+  savingsInterest: "",
+  fixedDepositInterest: "",
+  housePropertyInterest: "",
+  stcgAmount: "",
+  otherLtcgAmount: "",
 };
 
 describe("normalizeProfile Aadhaar payload", () => {
@@ -63,6 +83,68 @@ describe("normalizeProfile Aadhaar payload", () => {
     const payload = await captureNormalizePayload({ ...baseForm, aadhaar: "1234 5678 9012" });
 
     assert.equal(payload.aadhaar_number, "123456789012");
+  });
+});
+
+describe("document intake API helpers", () => {
+  afterEach(() => {
+    delete (globalThis as { fetch?: typeof fetch }).fetch;
+  });
+
+  it("uploads multipart documents with document type", async () => {
+    let capturedBody: FormData | undefined;
+    globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      capturedBody = init?.body as FormData;
+      return new Response(JSON.stringify({ document_id: "doc-1" }), { status: 200 });
+    }) as typeof fetch;
+
+    await uploadDocument(new File(["Gross Salary\n1200000"], "form16.csv", { type: "text/csv" }), "form16");
+
+    assert.ok(capturedBody);
+    assert.equal(capturedBody.get("document_type"), "form16");
+    assert.equal((capturedBody.get("file") as File).name, "form16.csv");
+  });
+
+  it("extracts and merges only approved extraction fields", async () => {
+    const extraction: ExtractionResult = {
+      document_id: "doc-1",
+      status: "completed",
+      fields: [
+        {
+          field_id: "salary-1",
+          label: "Gross Salary",
+          value: 1200000,
+          raw_path: "salaryIncome",
+          canonical_path: "income_heads.salary.gross_amount",
+          confidence: 0.9,
+          source: { document_id: "doc-1", locator: "csv:Gross Salary" },
+        },
+      ],
+    };
+    const calls: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      calls.push(String(input));
+      if (String(input).endsWith("/extract")) {
+        return new Response(JSON.stringify(extraction), { status: 200 });
+      }
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      assert.deepEqual(body.approved_field_ids, ["salary-1"]);
+      return new Response(
+        JSON.stringify({
+          merged_payload: { salaryIncome: "1200000" },
+          applied_field_ids: ["salary-1"],
+          skipped_field_ids: [],
+        }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+
+    const extracted = await extractDocument("doc-1");
+    const merge = await mergeExtractionFields(baseForm, extracted, ["salary-1"]);
+    const nextForm = applyMergedPayloadToForm(baseForm, merge.merged_payload);
+
+    assert.deepEqual(calls, ["/v1/uploads/doc-1/extract", "/v1/intake/merge-extractions"]);
+    assert.equal(nextForm.salaryIncome, "1200000");
   });
 });
 

@@ -204,6 +204,19 @@
           "default": null,
           "title": "Has Stcg"
         },
+        "stcg_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stcg Amount"
+        },
         "has_ltcg_112a": {
           "anyOf": [
             {
@@ -250,6 +263,19 @@
           ],
           "default": null,
           "title": "Has Other Ltcg"
+        },
+        "other_ltcg_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Other Ltcg Amount"
         },
         "has_land_or_building_gains": {
           "anyOf": [
@@ -347,12 +373,109 @@
           },
           "title": "Section Claims",
           "type": "array"
+        },
+        "section_80c_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section 80C Amount"
+        },
+        "section_80d_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section 80D Amount"
+        },
+        "section_80g_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section 80G Amount"
+        },
+        "nps_80ccd1b_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nps 80Ccd1B Amount"
         }
       },
       "required": [
         "has_deductions"
       ],
       "title": "Deductions",
+      "type": "object"
+    },
+    "EvidenceDocument": {
+      "additionalProperties": false,
+      "properties": {
+        "document_id": {
+          "title": "Document Id",
+          "type": "string"
+        },
+        "document_type": {
+          "title": "Document Type",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "field_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Field Paths",
+          "type": "array"
+        }
+      },
+      "required": [
+        "document_id",
+        "document_type",
+        "sha256"
+      ],
+      "title": "EvidenceDocument",
+      "type": "object"
+    },
+    "EvidenceSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "documents": {
+          "items": {
+            "$ref": "#/$defs/EvidenceDocument"
+          },
+          "title": "Documents",
+          "type": "array"
+        }
+      },
+      "title": "EvidenceSummary",
       "type": "object"
     },
     "ExemptionsFlags": {
@@ -521,6 +644,32 @@
           ],
           "default": null,
           "title": "Has Let Out Property"
+        },
+        "annual_value": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Annual Value"
+        },
+        "interest_on_housing_loan": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interest On Housing Loan"
         }
       },
       "required": [
@@ -600,6 +749,45 @@
           "default": null,
           "title": "Has Interest Income"
         },
+        "interest_savings_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interest Savings Amount"
+        },
+        "interest_fixed_deposit_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interest Fixed Deposit Amount"
+        },
+        "interest_other_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interest Other Amount"
+        },
         "has_dividend_income": {
           "anyOf": [
             {
@@ -616,6 +804,19 @@
           ],
           "default": null,
           "title": "Has Dividend Income"
+        },
+        "dividend_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dividend Amount"
         },
         "has_winnings_or_lottery_income": {
           "anyOf": [
@@ -744,6 +945,18 @@
           "default": null,
           "title": "Employer Count"
         },
+        "employer_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Employer Name"
+        },
         "has_pension_income": {
           "anyOf": [
             {
@@ -760,6 +973,32 @@
           ],
           "default": null,
           "title": "Has Pension Income"
+        },
+        "standard_deduction": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Standard Deduction"
+        },
+        "professional_tax": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Professional Tax"
         }
       },
       "required": [
@@ -887,6 +1126,121 @@
       "title": "SpecialConditions",
       "type": "object"
     },
+    "TaxPayments": {
+      "additionalProperties": false,
+      "properties": {
+        "tds_salary": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tds Salary"
+        },
+        "tds_other": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tds Other"
+        },
+        "tcs": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tcs"
+        },
+        "advance_tax": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Advance Tax"
+        },
+        "self_assessment_tax": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Self Assessment Tax"
+        }
+      },
+      "title": "TaxPayments",
+      "type": "object"
+    },
+    "TaxpayerMaster": {
+      "additionalProperties": false,
+      "properties": {
+        "full_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Full Name"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Email"
+        },
+        "mobile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mobile"
+        }
+      },
+      "title": "TaxpayerMaster",
+      "type": "object"
+    },
     "UserIdentity": {
       "additionalProperties": false,
       "properties": {
@@ -932,7 +1286,10 @@
   "additionalProperties": false,
   "properties": {
     "schema_version": {
-      "const": "canonical-tax-profile/v0.1",
+      "enum": [
+        "canonical-tax-profile/v0.1",
+        "canonical-tax-profile/v0.2"
+      ],
       "title": "Schema Version",
       "type": "string"
     },
@@ -953,6 +1310,9 @@
       ],
       "default": null,
       "title": "Previous Year"
+    },
+    "taxpayer_master": {
+      "$ref": "#/$defs/TaxpayerMaster"
     },
     "return_filing_reason": {
       "$ref": "#/$defs/ReturnFilingReason"
@@ -1002,6 +1362,9 @@
     "deductions": {
       "$ref": "#/$defs/Deductions"
     },
+    "tax_payments": {
+      "$ref": "#/$defs/TaxPayments"
+    },
     "foreign_assets": {
       "$ref": "#/$defs/ForeignAssets"
     },
@@ -1010,6 +1373,9 @@
     },
     "special_conditions": {
       "$ref": "#/$defs/SpecialConditions"
+    },
+    "evidence_summary": {
+      "$ref": "#/$defs/EvidenceSummary"
     }
   },
   "required": [
@@ -1027,5 +1393,5 @@
   "title": "Canonical Tax Profile",
   "type": "object",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "canonical-tax-profile/v0.1"
+  "$id": "canonical-tax-profile/v0.2"
 }
