@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import os
 
 from fastapi.testclient import TestClient
 
@@ -11,7 +12,7 @@ from app.models.filing_submission import FilingSubmission, SubmissionStatus
 from app.models.provider_spec import AuthType, ProviderMode, ProviderSpec, SignatureType
 from app.repositories.audit_repository import AUDIT_EVENT_CACHE
 from app.repositories.filing_workflow_repository import FILING_SUBMISSION_CACHE
-from app.repositories.provider_spec_repository import PROVIDER_SPEC_CACHE
+from app.repositories.provider_spec_repository import PROVIDER_CONTRACT_RESULT_CACHE, PROVIDER_SPEC_CACHE
 from app.services.provider_contract_test_service import ProviderContractTestService
 from app.services.provider_diagnostics_service import ProviderDiagnosticsService
 from app.services.provider_payload_retention_service import ProviderPayloadRetentionService
@@ -24,9 +25,11 @@ client = TestClient(app)
 
 
 def setup_function():
+    os.environ["PERSISTENCE_BACKEND"] = "memory"
     rate_limiter.clear()
     get_settings.cache_clear()
     PROVIDER_SPEC_CACHE.clear()
+    PROVIDER_CONTRACT_RESULT_CACHE.clear()
     FILING_SUBMISSION_CACHE.clear()
     AUDIT_EVENT_CACHE.clear()
 

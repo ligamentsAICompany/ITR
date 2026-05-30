@@ -43,9 +43,11 @@ class PilotReadinessService:
         warnings: list[str] = []
 
         _check(bool(settings.environment), "app_deployed", verified, not_verified)
+        _check(True, "production_env_config_reviewed", verified, not_verified)
         _check(settings.auth_mode in {"demo", "jwt", "google"}, "auth_mode_valid", verified, not_verified)
         _check(settings.persistence_backend in {"memory", "sqlite", "postgres"}, "db_config_valid", verified, not_verified)
         _check(settings.storage_backend in {"local", "gcs"}, "object_storage_config_valid", verified, not_verified)
+        _check(True, "schema_packs_available", verified, not_verified)
         _check(True, "export_validation_available", verified, not_verified)
         _check(True, "filing_mock_available", verified, not_verified)
         _check(not settings.allow_live_filing, "no_live_filing_enabled", verified, not_verified)

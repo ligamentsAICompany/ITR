@@ -1,5 +1,8 @@
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 from fastapi.testclient import TestClient
 
@@ -275,3 +278,77 @@ def test_generate_pilot_readiness_report_output_is_safe(monkeypatch, tmp_path, c
     assert "pilot_ready" in output
     assert "sandbox-secret-value" not in output
     assert "raw" not in output.lower()
+
+
+def test_cli_registered_spec_and_runner_results_persist_across_processes(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    spec_path = write_spec(tmp_path)
+    env = os.environ.copy()
+    env.update(
+        {
+            "PERSISTENCE_BACKEND": "sqlite",
+            "PERSISTENCE_STORAGE_DIR": str(tmp_path / "persist"),
+            "SECRET_BACKEND": "env",
+            "ERI_SANDBOX_CLIENT_ID_SECRET_NAME": "SBX_ID",
+            "ERI_SANDBOX_CLIENT_SECRET_SECRET_NAME": "SBX_SECRET",
+            "SBX_ID": "sandbox-client-id",
+            "SBX_SECRET": "sandbox-secret-value",
+            "ALLOW_SANDBOX_PROVIDER_CALLS": "true",
+            "FILING_PROVIDER": "eri_sandbox",
+            "FILING_PROVIDER_MODE": "sandbox",
+            "ERI_BASE_URL": "https://sandbox.invalid",
+            "ERI_TOKEN_URL": "https://sandbox.invalid/token",
+            "SANDBOX_PROVIDER_TRANSPORT": "mock",
+        }
+    )
+
+    registered = subprocess.run(
+        [sys.executable, "-m", "app.tools.register_provider_spec", "--file", str(spec_path)],
+        cwd=repo_root,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert registered.returncode == 0, registered.stderr
+
+    contract = subprocess.run(
+        [sys.executable, "-m", "app.tools.run_provider_contract_tests", "--provider", "eri", "--mode", "sandbox"],
+        cwd=repo_root,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert contract.returncode == 0, contract.stderr
+    assert '"status": "passed"' in contract.stdout
+    assert "Active sandbox provider spec is missing" not in contract.stdout
+    assert "sandbox-secret-value" not in contract.stdout
+
+    smoke = subprocess.run(
+        [sys.executable, "-m", "app.tools.run_sandbox_smoke"],
+        cwd=repo_root,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert smoke.returncode == 0, smoke.stderr
+    assert '"status": "passed"' in smoke.stdout
+    assert "Active sandbox provider spec is missing" not in smoke.stdout
+    assert "sandbox-secret-value" not in smoke.stdout
+
+    report = subprocess.run(
+        [sys.executable, "-m", "app.tools.generate_pilot_readiness_report"],
+        cwd=repo_root,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert report.returncode == 0, report.stderr
+    body = json.loads(report.stdout)
+    assert body["pilot_ready"] is True
+    assert "sandbox_contract_tests_passed" in body["verified_items"]
+    assert "sandbox_smoke_passed" in body["verified_items"]
+    assert "sandbox-secret-value" not in report.stdout

@@ -25,6 +25,7 @@ SQLITE_TABLES = {
     "filing_submissions",
     "filing_acknowledgements",
     "provider_specs",
+    "provider_contract_results",
     "audit_events",
 }
 
@@ -181,6 +182,18 @@ def get_json_record(table: str, record_id: str) -> dict | None:
     return json.loads(row["payload"])
 
 
+def list_json_records(table: str) -> list[dict]:
+    _validate_table(table)
+    backend = persistence_backend()
+    if backend == "memory":
+        return []
+    if backend == "postgres":
+        return list_postgres_json_records(table)
+    with sqlite_connection() as connection:
+        rows = connection.execute(f"SELECT payload FROM {table} ORDER BY created_at DESC").fetchall()
+    return [json.loads(row["payload"]) for row in rows]
+
+
 @contextmanager
 def postgres_connection() -> Iterator[Any]:
     settings = get_settings()
@@ -241,6 +254,18 @@ def get_postgres_json_record(table: str, record_id: str) -> dict | None:
     if isinstance(payload, str):
         return json.loads(payload)
     return dict(payload)
+
+
+def list_postgres_json_records(table: str) -> list[dict]:
+    with postgres_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT payload FROM {table} ORDER BY created_at DESC")
+            rows = cursor.fetchall()
+    records: list[dict] = []
+    for row in rows:
+        payload = row[0]
+        records.append(json.loads(payload) if isinstance(payload, str) else dict(payload))
+    return records
 
 
 def _validate_table(table: str) -> None:
