@@ -14,6 +14,24 @@ describe("demo auth panel", () => {
     assert.match(markup, /Org:/);
   });
 
+  it("keeps the first render stable when a demo user is stored in the browser", () => {
+    const previousWindow = globalThis.window;
+    globalThis.window = {
+      localStorage: {
+        getItem: () => "00000000-0000-4000-8000-000000000002",
+      },
+    } as unknown as Window & typeof globalThis;
+
+    try {
+      const markup = renderToStaticMarkup(<DemoAuthPanel />);
+
+      assert.match(markup, /taxpayer/);
+      assert.doesNotMatch(markup, /selected="">Demo Reviewer/);
+    } finally {
+      globalThis.window = previousWindow;
+    }
+  });
+
   it("hides demo identity controls in production mode", () => {
     const previousAuthMode = process.env.NEXT_PUBLIC_AUTH_MODE;
     const previousDemoFlag = process.env.NEXT_PUBLIC_DEMO_AUTH_ENABLED;

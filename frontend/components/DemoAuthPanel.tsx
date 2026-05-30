@@ -1,11 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DEMO_USERS, getDemoAuthContext, isDemoAuthEnabled, setDemoAuthContext } from "../lib/auth";
 import type { DemoAuthContext } from "../lib/auth";
 
 export function DemoAuthPanel() {
-  const [context, setContext] = useState<DemoAuthContext>(() => getDemoAuthContext());
+  const [context, setContext] = useState<DemoAuthContext>(DEMO_USERS[0]);
+
+  useEffect(() => {
+    if (isDemoAuthEnabled()) {
+      const timer = window.setTimeout(() => setContext(getDemoAuthContext()), 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, []);
 
   if (!isDemoAuthEnabled()) {
     return (
