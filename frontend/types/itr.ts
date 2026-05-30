@@ -429,3 +429,22 @@ export type ProviderError = {
   retryable: boolean;
   severity: "info" | "warning" | "error" | "critical";
 };
+
+export type ProviderContractTestSummary = {
+  status?: "passed" | "failed" | "not_verified";
+  tested_at?: string;
+};
+
+export type ProviderDiagnostics = {
+  provider: string;
+  mode: ProviderMode;
+  configured: boolean;
+  live_filing_enabled: boolean;
+  supported_operations: string[];
+  status?: string;
+  safe_readiness: string;
+  safe_error?: string | null;
+  last_contract_test?: ProviderContractTestSummary;
+  retryable_provider_error?: string | null;
+  last_status_check?: string | null;
+};

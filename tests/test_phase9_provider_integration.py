@@ -11,6 +11,7 @@ from app.models.filing_package import FilingPackage, FilingPackageStatus
 from app.models.filing_submission import FilingSubmission, SubmissionStatus
 from app.models.itr_export import ItrExport, ItrExportStatus, OfficialSchemaValidationResult
 from app.models.provider_integration import ProviderCapability, ProviderMode
+from app.models.provider_spec import AuthType, ProviderSpec, SignatureType
 from app.repositories.audit_repository import AUDIT_EVENT_CACHE
 from app.repositories.filing_package_repository import FILING_PACKAGE_CACHE
 from app.repositories.filing_workflow_repository import (
@@ -20,6 +21,7 @@ from app.repositories.filing_workflow_repository import (
     FILING_SUBMISSION_CACHE,
 )
 from app.repositories.itr_export_repository import ITR_EXPORT_CACHE
+from app.repositories.provider_spec_repository import PROVIDER_SPEC_CACHE, ProviderSpecRepository
 from app.services.eri_provider_factory import get_eri_provider_configuration
 from app.services.provider_error_mapper import ProviderErrorCode, map_provider_error, sanitize_provider_text
 from app.services.provider_status_service import ProviderStatusService
@@ -48,6 +50,7 @@ def setup_function():
     FILING_SUBMISSION_CACHE.clear()
     ACKNOWLEDGEMENT_CACHE.clear()
     AUDIT_EVENT_CACHE.clear()
+    PROVIDER_SPEC_CACHE.clear()
     get_settings.cache_clear()
 
 
@@ -91,6 +94,25 @@ def save_package_and_export():
     return package, export
 
 
+def save_active_provider_spec(mode: ProviderMode = ProviderMode.SANDBOX):
+    ProviderSpecRepository().save(
+        ProviderSpec(
+            provider_name="eri",
+            provider_mode=mode,
+            spec_version=f"{mode.value}-v1",
+            base_url=f"https://{mode.value}.invalid",
+            token_url=f"https://{mode.value}.invalid/token",
+            callback_url="https://api.example.com/v1/filing/provider-callbacks/eri_sandbox",
+            supported_operations=["submit_return", "status_check", "everification", "acknowledgement", "callback"],
+            auth_type=AuthType.BEARER_TOKEN,
+            signature_type=SignatureType.HMAC_SIGNATURE,
+            payload_format="json",
+            status_mapping_version="v1",
+            is_active=True,
+        )
+    )
+
+
 def test_provider_mode_models_and_default_config_are_safe(monkeypatch):
     monkeypatch.delenv("FILING_PROVIDER", raising=False)
     monkeypatch.delenv("FILING_PROVIDER_MODE", raising=False)
@@ -112,6 +134,7 @@ def test_sandbox_and_live_missing_config_fail_safely(monkeypatch):
     monkeypatch.delenv("ERI_CLIENT_ID", raising=False)
     monkeypatch.delenv("ERI_CLIENT_SECRET", raising=False)
     get_settings.cache_clear()
+    save_active_provider_spec()
 
     sandbox = get_eri_provider_configuration()
     assert sandbox.configured is False
@@ -136,6 +159,7 @@ def test_live_enabled_without_credentials_blocks_provider_call(monkeypatch):
     monkeypatch.delenv("ERI_CLIENT_ID", raising=False)
     monkeypatch.delenv("ERI_CLIENT_SECRET", raising=False)
     get_settings.cache_clear()
+    save_active_provider_spec(ProviderMode.LIVE)
 
     config = get_eri_provider_configuration()
 
@@ -167,6 +191,7 @@ def test_sandbox_provider_submit_status_everification_and_ack_are_mocked(monkeyp
     monkeypatch.setenv("ERI_CLIENT_ID", "sandbox-client")
     monkeypatch.setenv("ERI_CLIENT_SECRET", "sandbox-secret")
     get_settings.cache_clear()
+    save_active_provider_spec()
 
     from app.services.eri_provider_factory import get_eri_provider
 
@@ -194,6 +219,7 @@ def test_provider_status_polling_updates_submission_and_audits(monkeypatch):
     monkeypatch.setenv("ERI_CLIENT_ID", "sandbox-client")
     monkeypatch.setenv("ERI_CLIENT_SECRET", "sandbox-secret")
     get_settings.cache_clear()
+    save_active_provider_spec()
 
     package, export = save_package_and_export()
     submission = FilingSubmission(

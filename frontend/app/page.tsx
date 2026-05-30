@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AgentPanel } from "@/components/AgentPanel";
 import { DecisionCard } from "@/components/DecisionCard";
 import { DemoAuthPanel } from "@/components/DemoAuthPanel";
@@ -38,6 +38,7 @@ import {
   getEVerificationStatus,
   getExplanation,
   getMissingFields,
+  getProviderDiagnostics,
   grantFilingConsent,
   initiateEVerification,
   applyMergedPayloadToForm,
@@ -73,6 +74,7 @@ import type {
   ITRDecisionResponse,
   ItrExport,
   ItrExportArtifact,
+  ProviderDiagnostics,
   TaxComputationResult,
   ValidationReport,
 } from "@/types/itr";
@@ -158,6 +160,7 @@ export default function Home() {
   const [itrExportError, setItrExportError] = useState<string | null>(null);
   const [filingSubmission, setFilingSubmission] = useState<FilingSubmission | null>(null);
   const [filingReadiness, setFilingReadiness] = useState<FilingReadinessResult | null>(null);
+  const [providerDiagnostics, setProviderDiagnostics] = useState<ProviderDiagnostics | null>(null);
   const [filingConsent, setFilingConsent] = useState<FilingConsent | null>(null);
   const [filingApproval, setFilingApproval] = useState<FilingApproval | null>(null);
   const [acknowledgement, setAcknowledgement] = useState<Acknowledgement | null>(null);
@@ -173,6 +176,14 @@ export default function Home() {
     [decision, explanation, clarification, missingFields, escalation, loading, error],
   );
   const aadhaarError = useMemo(() => validateAadhaar(form.aadhaar).error, [form.aadhaar]);
+
+  useEffect(() => {
+    void getProviderDiagnostics()
+      .then(setProviderDiagnostics)
+      .catch(() => {
+        setProviderDiagnostics(null);
+      });
+  }, []);
 
   function updateForm(field: keyof BasicFormState, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -791,6 +802,7 @@ export default function Home() {
           <ProviderStatusPanel
             readiness={filingReadiness}
             submission={filingSubmission}
+            diagnostics={providerDiagnostics}
             everificationSupported={(filingSubmission?.provider_mode ?? filingReadiness?.provider_mode ?? "mock") !== "live"}
             acknowledgementAvailable={Boolean(acknowledgement || filingSubmission?.acknowledgement_id)}
           />

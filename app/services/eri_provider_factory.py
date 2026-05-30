@@ -7,6 +7,7 @@ from app.models.provider_integration import ProviderCapability, ProviderMode
 from app.services.eri_client import EriClient
 from app.services.eri_provider import EriProvider
 from app.services.mock_filing_provider import MockFilingProvider
+from app.services.provider_spec_service import ProviderSpecService
 
 
 @dataclass(frozen=True)
@@ -34,21 +35,15 @@ def get_eri_provider_configuration() -> EriProviderConfiguration:
     )
     if provider == "mock":
         return EriProviderConfiguration("mock", ProviderMode.MOCK, True, live_allowed, capabilities=capabilities)
-    if provider not in {"eri_sandbox", "eri_live"}:
-        return EriProviderConfiguration(provider, mode, False, live_allowed, "Unsupported filing provider")
-    if provider == "eri_sandbox" and mode != ProviderMode.SANDBOX:
-        return EriProviderConfiguration(provider, mode, False, live_allowed, "ERI sandbox requires FILING_PROVIDER_MODE=sandbox")
-    if provider == "eri_live":
-        if mode != ProviderMode.LIVE:
-            return EriProviderConfiguration(provider, mode, False, live_allowed, "ERI live requires FILING_PROVIDER_MODE=live")
-        if not live_allowed:
-            return EriProviderConfiguration(provider, mode, False, live_allowed, "Live filing is disabled")
-        if getattr(settings, "environment", "development") != "production":
-            return EriProviderConfiguration(provider, mode, False, live_allowed, "Live filing requires ENVIRONMENT=production")
-    missing = _missing_eri_config(live=provider == "eri_live")
-    if missing:
-        return EriProviderConfiguration(provider, mode, False, live_allowed, "ERI provider credentials are not configured", tuple(missing))
-    return EriProviderConfiguration(provider, mode, True, live_allowed, capabilities=capabilities)
+    spec_readiness = ProviderSpecService().readiness_for_current_provider()
+    spec_capabilities = tuple(
+        ProviderCapability(item)
+        for item in spec_readiness.supported_operations
+        if item in {capability.value for capability in ProviderCapability}
+    )
+    if not spec_readiness.configured:
+        return EriProviderConfiguration(provider, mode, False, live_allowed, spec_readiness.safe_error, spec_readiness.missing, spec_capabilities)
+    return EriProviderConfiguration(provider, mode, True, live_allowed, capabilities=spec_capabilities)
 
 
 def get_eri_provider():
@@ -66,24 +61,6 @@ def get_eri_provider():
         allow_network=False,
     )
     return EriProvider(mode=config.mode, client=client, sandbox_mocked=config.mode == ProviderMode.SANDBOX)
-
-
-def _missing_eri_config(*, live: bool) -> list[str]:
-    settings = get_settings()
-    required = [
-        ("ERI_BASE_URL", getattr(settings, "eri_base_url", None)),
-        ("ERI_TOKEN_URL", getattr(settings, "eri_token_url", None)),
-        ("ERI_CLIENT_ID", getattr(settings, "eri_client_id", None)),
-        ("ERI_CLIENT_SECRET", getattr(settings, "eri_client_secret", None)),
-    ]
-    if live:
-        required.extend(
-            [
-                ("ERI_CALLBACK_URL", getattr(settings, "eri_callback_url", None)),
-                ("ERI_PRIVATE_KEY_SECRET_NAME", getattr(settings, "eri_private_key_secret_name", None)),
-            ]
-        )
-    return [name for name, value in required if not value]
 
 
 def _normalize_provider(provider: str) -> str:

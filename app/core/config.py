@@ -41,8 +41,11 @@ class Settings:
     eri_private_key_secret_name: str | None
     eri_timeout_seconds: int
     eri_retry_count: int
+    eri_retry_backoff_seconds: float
     eri_status_poll_interval_seconds: int
     allow_unsigned_provider_callbacks: bool
+    store_provider_raw_payloads: bool
+    provider_raw_payload_retention_days: int
     mock_filing_outcome: str
 
     def __init__(self) -> None:
@@ -89,6 +92,7 @@ class Settings:
         self.eri_private_key_secret_name = getenv("ERI_PRIVATE_KEY_SECRET_NAME") or None
         self.eri_timeout_seconds = int(getenv("ERI_TIMEOUT_SECONDS", "10"))
         self.eri_retry_count = int(getenv("ERI_RETRY_COUNT", "2"))
+        self.eri_retry_backoff_seconds = float(getenv("ERI_RETRY_BACKOFF_SECONDS", "1"))
         self.eri_status_poll_interval_seconds = int(getenv("ERI_STATUS_POLL_INTERVAL_SECONDS", "30"))
         self.allow_unsigned_provider_callbacks = getenv("ALLOW_UNSIGNED_PROVIDER_CALLBACKS", "false").lower() in {
             "1",
@@ -96,6 +100,13 @@ class Settings:
             "yes",
             "on",
         }
+        self.store_provider_raw_payloads = getenv("STORE_PROVIDER_RAW_PAYLOADS", "false").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        self.provider_raw_payload_retention_days = int(getenv("PROVIDER_RAW_PAYLOAD_RETENTION_DAYS", "30"))
         self.mock_filing_outcome = getenv("MOCK_FILING_OUTCOME", "success").lower()
 
     @property
@@ -138,8 +149,12 @@ class Settings:
             errors.append("ERI_TIMEOUT_SECONDS must be positive")
         if self.eri_retry_count < 0:
             errors.append("ERI_RETRY_COUNT cannot be negative")
+        if self.eri_retry_backoff_seconds < 0:
+            errors.append("ERI_RETRY_BACKOFF_SECONDS cannot be negative")
         if self.eri_status_poll_interval_seconds <= 0:
             errors.append("ERI_STATUS_POLL_INTERVAL_SECONDS must be positive")
+        if self.provider_raw_payload_retention_days <= 0:
+            errors.append("PROVIDER_RAW_PAYLOAD_RETENTION_DAYS must be positive")
         if self.is_production:
             if self.debug:
                 errors.append("DEBUG=false is required in production")

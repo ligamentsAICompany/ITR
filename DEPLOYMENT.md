@@ -69,8 +69,9 @@ localhost public API URLs.
 
 ## ERI Provider Configuration
 
-Phase 9 only prepares the ERI integration foundation. Mock filing remains the
-default and live filing is blocked unless all of these are true:
+Phase 10 prepares ERI sandbox readiness without enabling live filing by default.
+Mock filing remains the default and live filing is blocked unless all of these
+are true:
 
 - `FILING_PROVIDER=eri_live`
 - `FILING_PROVIDER_MODE=live`
@@ -79,9 +80,10 @@ default and live filing is blocked unless all of these are true:
 - All required ERI configuration values are present
 
 Sandbox mode uses `FILING_PROVIDER=eri_sandbox` and
-`FILING_PROVIDER_MODE=sandbox`. It still requires provider configuration, but
-the Phase 9 adapter returns mocked sandbox responses when official ERI sandbox
-transport is unavailable. Tests must not call live government or ERI endpoints.
+`FILING_PROVIDER_MODE=sandbox`. Sandbox/live modes require an active provider
+spec plus Secret Manager-backed credentials. The adapter still avoids real ERI
+network calls unless official transport is explicitly implemented and approved.
+Tests must not call live government or ERI endpoints.
 
 Store provider secrets in Secret Manager, not in source files or `.env`
 commits:
@@ -99,7 +101,10 @@ Non-secret provider values can be configured as environment variables:
 - `ERI_CALLBACK_URL`
 - `ERI_TIMEOUT_SECONDS`
 - `ERI_RETRY_COUNT`
+- `ERI_RETRY_BACKOFF_SECONDS`
 - `ERI_STATUS_POLL_INTERVAL_SECONDS`
+- `STORE_PROVIDER_RAW_PAYLOADS=false`
+- `PROVIDER_RAW_PAYLOAD_RETENTION_DAYS=30`
 
 Provider callback signatures are verified with configured provider secret
 material. Unsigned callbacks fail closed in production unless a controlled
@@ -108,6 +113,141 @@ Do not log raw provider payloads, tokens, PAN/Aadhaar, certificate contents, or
 internal storage paths. If raw provider payload retention is required later,
 store it only in encrypted, access-controlled storage with a dedicated retention
 policy.
+
+### ERI Sandbox Setup
+
+1. Create an active provider spec for provider `eri` and mode `sandbox` with
+   non-secret values only: base URL, token URL, callback URL, supported
+   operations, auth type, signature type, payload format, and status mapping
+   version.
+2. Store sandbox credentials in Secret Manager or environment-backed secrets:
+   `ERI_CLIENT_ID`, `ERI_CLIENT_SECRET`, and any certificate/private-key secret
+   reference required by the approved provider spec.
+3. Keep `ALLOW_LIVE_FILING=false`.
+4. Run provider contract tests. If real sandbox credentials are unavailable,
+   the result must remain `NOT VERIFIED`; do not mark real provider contracts
+   as passed.
+5. Verify `/v1/filing/provider-diagnostics` shows safe fields only and does not
+   include raw provider payloads, PAN/Aadhaar, credentials, or internal paths.
+
+### Live Filing Enablement Checklist
+
+Live filing cannot be enabled until every item below is complete:
+
+- Legal approval complete.
+- Provider agreement complete.
+- Credentials provisioned in Secret Manager.
+- Active live provider spec approved.
+- Sandbox contract tests pass against approved credentials.
+- Callback signature verification enabled and fail-closed in production.
+- Monitoring and safe provider diagnostics configured.
+- Rollback plan approved.
+- Senior engineering approval complete.
+- `ALLOW_LIVE_FILING=true`, `FILING_PROVIDER=eri_live`,
+  `FILING_PROVIDER_MODE=live`, and `ENVIRONMENT=production` are set only for
+  the approved production rollout.
+
+### Secret Manager Requirements
+
+Store all credentials and private material in Secret Manager. The runtime
+service account needs `roles/secretmanager.secretAccessor` scoped only to the
+specific ERI, database, JWT, and certificate secrets it must read. Never commit
+provider credentials, private keys, certificate contents, tokens, or `.env`
+files.
+
+### Required IAM Roles
+
+- Runtime service account: `roles/cloudsql.client` for Cloud SQL PostgreSQL.
+- Runtime service account: object create/read/delete permissions scoped to the
+  private GCS bucket.
+- Runtime service account: `roles/secretmanager.secretAccessor` scoped to
+  approved secrets only.
+- Deployer: Artifact Registry writer plus Cloud Run deployer/admin permissions.
+- Operators: read access to logs/audit dashboards without access to raw
+  provider payloads or secrets.
+
+### Provider Callback URL Setup
+
+Configure provider callback URLs to point to
+`/v1/filing/provider-callbacks/{provider}` where provider is `eri_sandbox` or
+`eri_live`. Use HTTPS only. Register the exact callback URL in the provider
+portal and in the active provider spec. Callback payloads are parsed and mapped
+to internal statuses, but raw callback bodies are not returned from public APIs.
+
+### Callback Signature Config
+
+Production callbacks must be signed. HMAC signatures use
+`X-Provider-Signature: sha256=<digest>`. When `X-Provider-Timestamp` and
+`X-Provider-Nonce` are present, they are included in verification and replayed
+nonce/timestamp pairs are rejected. Unsigned or invalid signatures are rejected
+in production unless a controlled acceptance environment explicitly opts into
+`ALLOW_UNSIGNED_PROVIDER_CALLBACKS=true`.
+
+### Rollback Plan
+
+1. Set `ALLOW_LIVE_FILING=false`.
+2. Switch `FILING_PROVIDER=mock` and `FILING_PROVIDER_MODE=mock` if provider
+   traffic must stop immediately.
+3. Deactivate the active live provider spec.
+4. Redeploy the previous known-good image if application behavior is suspect.
+5. Review provider audit events and confirm no unacknowledged live submission
+   remains in an ambiguous state.
+
+### Incident Runbook
+
+For provider incidents, preserve audit logs, disable live filing, stop retries
+for non-idempotent operations, and notify legal/business owners. Do not expose
+raw provider payloads in tickets or chat. Use request IDs, provider mode,
+operation, normalized status, retry count, and safe error code for triage.
+
+### Failed Submission Handling
+
+Provider failures map to safe internal statuses and messages. Schema or invalid
+payload failures are not retried. Retryable provider unavailability, timeout,
+or rate-limit errors may be retried within the configured policy. Do not claim
+filed/submitted/verified/acknowledged unless the provider confirms it.
+
+### Duplicate Submission Handling
+
+Duplicate submission responses are treated as non-retryable and require manual
+review against provider reference IDs and audit events. Do not submit again
+until the provider state is reconciled.
+
+### Rate Limit Handling
+
+Rate-limit responses use `ERI_RETRY_COUNT`, `ERI_RETRY_BACKOFF_SECONDS`, and
+provider retry-after guidance when available. Operators should wait for the
+provider interval and avoid manual rapid retries.
+
+### Timeout Handling
+
+Timeouts are safe retryable errors for status-like operations. For submission
+operations, reconcile provider status before retrying to avoid duplicate
+filings.
+
+### Data Retention Policy
+
+`STORE_PROVIDER_RAW_PAYLOADS=false` is the default and production-safe setting.
+If raw provider payload retention is approved later, encrypted storage,
+restricted IAM, redaction, retention enforcement, and legal approval are
+required before enablement.
+
+### Logs / Audit Review Process
+
+Provider observability must include safe fields only: provider, mode,
+operation, status, duration, retry count, error code, normalized status,
+request ID, and submission ID. Logs and audit events must not include
+PAN/Aadhaar, raw document text, raw provider payloads, credentials, or internal
+storage paths.
+
+### Legal / Business Approval Checklist
+
+- Legal confirms provider agreement and live filing authority.
+- Business owner approves the release window and rollback owner.
+- Security approves Secret Manager, IAM, callback signature, and logging setup.
+- Senior engineering approves live provider spec and contract-test evidence.
+- Support has failed submission, duplicate submission, rate-limit, and timeout
+  playbooks ready.
 
 Initialize persistence before first traffic:
 

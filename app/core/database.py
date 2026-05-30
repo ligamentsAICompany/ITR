@@ -24,6 +24,7 @@ SQLITE_TABLES = {
     "filing_approvals",
     "filing_submissions",
     "filing_acknowledgements",
+    "provider_specs",
     "audit_events",
 }
 

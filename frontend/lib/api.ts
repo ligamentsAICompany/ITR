@@ -12,6 +12,7 @@ import type {
   FilingPackage,
   FilingReadinessResult,
   FilingSubmission,
+  ProviderDiagnostics,
   ITRDecisionResponse,
   ItrExport,
   ItrExportArtifact,
@@ -396,4 +397,15 @@ export async function getAcknowledgement(submissionId: string): Promise<Acknowle
     throw new Error(toFriendlyErrorMessage("/v1/filing/submissions/acknowledgement", response.status, errorBody));
   }
   return (await response.json()) as Acknowledgement;
+}
+
+export async function getProviderDiagnostics(): Promise<ProviderDiagnostics> {
+  const response = await fetch(`${API_BASE_URL}/v1/filing/provider-diagnostics`, {
+    headers: demoAuthHeaders(),
+  });
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(toFriendlyErrorMessage("/v1/filing/provider-diagnostics", response.status, errorBody));
+  }
+  return (await response.json()) as ProviderDiagnostics;
 }

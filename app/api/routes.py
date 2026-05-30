@@ -83,7 +83,6 @@ from app.services.explanation_service import explain_decision
 from app.services.filing_package_service import FilingPackageService
 from app.services.filing_readiness_service import FilingReadinessResult
 from app.services.filing_service import FilingService
-from app.services.eri_provider import normalize_provider_status
 from app.services.itr_export_service import ItrExportService
 from app.services.itr_service import get_missing_fields, run_itr_decision
 from app.services.normalization_service import normalize_raw_user_data
@@ -92,6 +91,8 @@ from app.services.slm_service import get_default_slm_service
 from app.services.storage_service import DocumentStorageService, get_document_storage_service
 from app.services.tax_computation_service import MissingTaxConfigError
 from app.services.schema_pack_service import SchemaPackService
+from app.services.provider_diagnostics_service import ProviderDiagnostics, ProviderDiagnosticsService
+from app.services.provider_status_mapper import ProviderStatusMapper
 from app.models.auth import UserRole
 
 router = APIRouter()
@@ -107,6 +108,7 @@ authorization_service = AuthorizationService()
 audit_service = AuditService()
 provider_callback_audit_repository = AuditRepository()
 provider_callback_submission_repository = FilingSubmissionRepository()
+PROVIDER_CALLBACK_REPLAY_CACHE: set[str] = set()
 
 
 def _storage_service() -> DocumentStorageService:
@@ -790,7 +792,7 @@ def _filing_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=400, detail=str(exc))
 
 
-def _verify_provider_callback_signature(*, body: bytes, signature: str | None) -> bool:
+def _verify_provider_callback_signature(*, body: bytes, signature: str | None, timestamp: str | None = None, nonce: str | None = None) -> bool:
     settings = get_settings()
     secret = settings.eri_client_secret
     if not secret:
@@ -798,7 +800,8 @@ def _verify_provider_callback_signature(*, body: bytes, signature: str | None) -
     if not signature:
         return False
     supplied = signature.removeprefix("sha256=").strip()
-    expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    signed_body = body + (timestamp or "").encode() + (nonce or "").encode() if timestamp and nonce else body
+    expected = hmac.new(secret.encode(), signed_body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(supplied, expected)
 
 
@@ -831,15 +834,28 @@ async def provider_callback(provider: str, request: Request) -> ProviderCallback
     if provider not in {"mock", "eri", "eri_sandbox", "eri_live"}:
         raise HTTPException(status_code=400, detail="Unsupported filing provider callback")
     body = await request.body()
-    verified = _verify_provider_callback_signature(body=body, signature=request.headers.get("X-Provider-Signature"))
+    timestamp = request.headers.get("X-Provider-Timestamp")
+    nonce = request.headers.get("X-Provider-Nonce")
+    verified = _verify_provider_callback_signature(
+        body=body,
+        signature=request.headers.get("X-Provider-Signature"),
+        timestamp=timestamp,
+        nonce=nonce,
+    )
     settings = get_settings()
     if settings.is_production and not verified and not settings.allow_unsigned_provider_callbacks:
         raise HTTPException(status_code=401, detail="Provider callback signature verification failed")
+    if verified and timestamp and nonce:
+        replay_key = f"{provider}:{timestamp}:{nonce}"
+        if replay_key in PROVIDER_CALLBACK_REPLAY_CACHE:
+            raise HTTPException(status_code=409, detail="Provider callback replay rejected")
+        PROVIDER_CALLBACK_REPLAY_CACHE.add(replay_key)
     try:
         payload = json.loads(body.decode() or "{}")
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=400, detail="Provider callback payload is invalid") from exc
     provider_status = str(payload.get("provider_status") or payload.get("status") or "status_unknown")
+    mapped_status = ProviderStatusMapper().map_status(provider_status)
     event = ProviderCallbackEvent(
         callback_id=str(payload.get("callback_id") or payload.get("event_id") or "00000000-0000-4000-8000-000000000000"),
         provider=provider,
@@ -847,7 +863,7 @@ async def provider_callback(provider: str, request: Request) -> ProviderCallback
         provider_reference_id=str(payload.get("provider_reference_id") or ""),
         verified=verified,
         provider_status=provider_status,
-        normalized_status=normalize_provider_status(provider_status),
+        normalized_status=mapped_status.normalized_status,
     )
     submission = provider_callback_submission_repository.get_by_provider_reference(event.provider_reference_id)
     if submission is not None and event.normalized_status is not None:
@@ -857,6 +873,11 @@ async def provider_callback(provider: str, request: Request) -> ProviderCallback
         provider_callback_submission_repository.save(submission)
     _audit_provider_callback(event)
     return event
+
+
+@router.get("/filing/provider-diagnostics", response_model=ProviderDiagnostics)
+def provider_diagnostics(_session: SessionContext = Depends(get_session_context)) -> ProviderDiagnostics:
+    return ProviderDiagnosticsService().current()
 
 
 @router.post("/filing/consents/request", response_model=FilingConsent)

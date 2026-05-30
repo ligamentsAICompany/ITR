@@ -149,6 +149,20 @@ describe("filing integration UI", () => {
             provider_mode: "sandbox",
             last_checked_at: "2026-05-30T00:00:00Z",
           }}
+          diagnostics={{
+            provider: "eri_sandbox",
+            mode: "sandbox",
+            configured: false,
+            live_filing_enabled: false,
+            supported_operations: ["submit_return", "status_check", "callback"],
+            safe_readiness: "not_configured",
+            last_contract_test: {
+              status: "not_verified",
+              tested_at: "2026-05-30T00:00:00Z",
+            },
+            retryable_provider_error: "Provider rate limit reached. Please retry after the provider interval.",
+            last_status_check: "2026-05-30T00:00:00Z",
+          }}
           everificationSupported={false}
           acknowledgementAvailable={false}
         />
@@ -163,7 +177,12 @@ describe("filing integration UI", () => {
       </>,
     );
 
-    assert.match(html, /Live filing is disabled unless explicitly enabled and approved\./);
+    assert.match(html, /Live filing requires approved credentials, legal approval, and explicit enablement\./);
+    assert.match(html, /not configured/i);
+    assert.match(html, /contract test/i);
+    assert.match(html, /not verified/i);
+    assert.match(html, /submit return/i);
+    assert.match(html, /safe readiness/i);
     assert.match(html, /live filing disabled/i);
     assert.match(html, /provider configuration missing/i);
     assert.match(html, /last status check/i);
