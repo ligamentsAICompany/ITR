@@ -287,3 +287,57 @@ export type DraftItrPayload = Record<string, unknown> & {
   payload_type?: "draft_itr_payload";
   schema_status?: "internal_draft_not_official";
 };
+
+export type ItrExportStatus =
+  | "not_configured"
+  | "draft"
+  | "schema_failed"
+  | "schema_passed"
+  | "ready_for_download"
+  | "blocked";
+
+export type OfficialSchemaValidationStatus = "not_configured" | "failed" | "passed" | "needs_review";
+
+export type OfficialSchemaValidationError = {
+  code: string;
+  message: string;
+  field_path?: string | null;
+  schema_path?: string | null;
+  severity: "critical" | "high" | "medium" | "low" | "info";
+};
+
+export type OfficialSchemaValidationResult = {
+  validation_id: string;
+  schema_pack_id?: string | null;
+  candidate_itr: string;
+  assessment_year: string;
+  status: OfficialSchemaValidationStatus;
+  errors: OfficialSchemaValidationError[];
+  warnings: OfficialSchemaValidationError[];
+  validated_at: string;
+};
+
+export type ItrExportArtifact = {
+  artifact_id: string;
+  artifact_type: "official_itr_json";
+  filename: string;
+  mime_type: string;
+  size: number;
+  sha256: string;
+  created_at: string;
+};
+
+export type ItrExport = {
+  export_id: string;
+  package_id?: string | null;
+  assessment_year: string;
+  previous_year?: string | null;
+  candidate_itr: string;
+  schema_pack_id?: string | null;
+  status: ItrExportStatus;
+  validation_result: OfficialSchemaValidationResult;
+  artifacts: ItrExportArtifact[];
+  warnings: string[];
+  created_at: string;
+  updated_at: string;
+};

@@ -16,6 +16,10 @@ SQLITE_TABLES = {
     "tax_computations",
     "filing_packages",
     "filing_package_artifacts",
+    "schema_packs",
+    "schema_pack_contents",
+    "itr_exports",
+    "itr_export_artifacts",
     "audit_events",
 }
 
@@ -251,9 +255,9 @@ def _record_metadata(payload: dict, table: str) -> dict[str, str | None]:
 
 
 def _package_id_from_artifact(payload: dict, table: str) -> str | None:
-    if table != "filing_package_artifacts":
-        return None
-    return payload.get("package_id")
+    if table in {"filing_package_artifacts", "itr_export_artifacts"}:
+        return payload.get("package_id")
+    return None
 
 
 def _string_or_none(value: Any) -> str | None:

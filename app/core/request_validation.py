@@ -20,6 +20,8 @@ async def request_validation_middleware(
     content_type = request.headers.get("content-type", "")
     if request.url.path.startswith("/v1/uploads/") and request.url.path.endswith("/extract"):
         return await call_next(request)
+    if request.url.path.startswith("/v1/schema-packs/") and request.url.path.endswith("/activate"):
+        return await call_next(request)
 
     if content_type.lower().startswith("multipart/form-data"):
         return await call_next(request)

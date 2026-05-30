@@ -9,6 +9,7 @@ import { EscalationAlert } from "@/components/EscalationAlert";
 import { ExtractionReviewPanel } from "@/components/ExtractionReviewPanel";
 import { FilingPackagePanel } from "@/components/FilingPackagePanel";
 import { IntakeForm } from "@/components/IntakeForm";
+import { ItrExportPanel } from "@/components/ItrExportPanel";
 import { Navbar } from "@/components/Navbar";
 import { Spinner } from "@/components/Spinner";
 import { TaxComputationPanel } from "@/components/TaxComputationPanel";
@@ -17,7 +18,9 @@ import { WorkflowLog } from "@/components/WorkflowLog";
 import {
   computeTax,
   downloadFilingPackageArtifact,
+  downloadItrExportArtifact,
   generateFilingPackage,
+  generateItrExport,
   getClarification,
   getDecision,
   getExplanation,
@@ -41,6 +44,8 @@ import type {
   FilingPackage,
   FilingPackageArtifact,
   ITRDecisionResponse,
+  ItrExport,
+  ItrExportArtifact,
   TaxComputationResult,
   ValidationReport,
 } from "@/types/itr";
@@ -122,6 +127,8 @@ export default function Home() {
   const [filingPackage, setFilingPackage] = useState<FilingPackage | null>(null);
   const [draftPayload, setDraftPayload] = useState<DraftItrPayload | null>(null);
   const [filingPackageError, setFilingPackageError] = useState<string | null>(null);
+  const [itrExport, setItrExport] = useState<ItrExport | null>(null);
+  const [itrExportError, setItrExportError] = useState<string | null>(null);
 
   const questions = useMemo(
     () => (clarification?.question ? [clarification.question] : []),
@@ -146,6 +153,12 @@ export default function Home() {
     setFilingPackage(null);
     setDraftPayload(null);
     setFilingPackageError(null);
+    clearItrExport();
+  }
+
+  function clearItrExport() {
+    setItrExport(null);
+    setItrExportError(null);
   }
 
   function handleExtraction(document: DocumentRecord, extractionResult: ExtractionResult) {
@@ -197,6 +210,7 @@ export default function Home() {
     setFilingPackage(null);
     setDraftPayload(null);
     setFilingPackageError(null);
+    clearItrExport();
     setMissingFields([]);
     setProfile(null);
     setExplanation(null);
@@ -310,6 +324,7 @@ export default function Home() {
         documents,
       });
       setFilingPackage(packageResult);
+      clearItrExport();
       const draftArtifact = packageResult.artifacts.find((artifact) => artifact.artifact_type === "draft_itr_payload");
       if (draftArtifact) {
         const blob = await downloadFilingPackageArtifact(packageResult.package_id, draftArtifact.artifact_id);
@@ -342,6 +357,50 @@ export default function Home() {
       setFilingPackageError(
         caughtError instanceof Error ? caughtError.message : "Could not download the selected artifact.",
       );
+    }
+  }
+
+  async function handleGenerateItrExport() {
+    if (!profile || !decision || !validationReport || !taxComputation || !filingPackage) {
+      setItrExportError("Generate a filing package before creating the official-schema export.");
+      return;
+    }
+
+    setLoading(true);
+    setItrExportError(null);
+    try {
+      pushLog("itr-export: POST /v1/itr-exports/generate");
+      const exportResult = await generateItrExport({
+        packageId: filingPackage.package_id,
+        profile,
+        decision,
+        validationReport,
+        taxComputation,
+      });
+      setItrExport(exportResult);
+      pushLog(`itr-export: ${exportResult.status.replaceAll("_", " ")}`);
+    } catch (caughtError) {
+      setItrExportError(caughtError instanceof Error ? caughtError.message : "Could not generate the official export.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDownloadItrExportArtifact(artifact: ItrExportArtifact) {
+    if (!itrExport) {
+      return;
+    }
+
+    try {
+      const blob = await downloadItrExportArtifact(itrExport.export_id, artifact);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = artifact.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (caughtError) {
+      setItrExportError(caughtError instanceof Error ? caughtError.message : "Could not download the export artifact.");
     }
   }
 
@@ -458,6 +517,15 @@ export default function Home() {
             onDownloadArtifact={(artifact) => void handleDownloadArtifact(artifact)}
             canGenerate={Boolean(profile && decision && validationReport && taxComputation)}
             loading={loading}
+          />
+          <ItrExportPanel
+            filingPackage={filingPackage}
+            itrExport={itrExport}
+            error={itrExportError}
+            loading={loading}
+            canGenerate={Boolean(profile && decision && validationReport && taxComputation && filingPackage)}
+            onGenerate={() => void handleGenerateItrExport()}
+            onDownloadArtifact={(artifact) => void handleDownloadItrExportArtifact(artifact)}
           />
           <EscalationAlert show={escalation} />
           <WorkflowLog logs={logs} />

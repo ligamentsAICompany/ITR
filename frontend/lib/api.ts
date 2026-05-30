@@ -8,6 +8,8 @@ import type {
   ExplanationResponse,
   FilingPackage,
   ITRDecisionResponse,
+  ItrExport,
+  ItrExportArtifact,
   MergeExtractionResult,
   TaxComputationResult,
   ValidationReport,
@@ -280,6 +282,39 @@ export async function downloadFilingPackageArtifact(packageId: string, artifactI
   if (!response.ok) {
     const errorBody = await response.text();
     throw new Error(toFriendlyErrorMessage("/v1/filing-packages/artifacts", response.status, errorBody));
+  }
+  return response.blob();
+}
+
+export function generateItrExport({
+  packageId,
+  profile,
+  decision,
+  validationReport,
+  taxComputation,
+}: {
+  packageId: string;
+  profile: CanonicalTaxProfile;
+  decision: ITRDecisionResponse;
+  validationReport: ValidationReport;
+  taxComputation: TaxComputationResult;
+}): Promise<ItrExport> {
+  return postJson<ItrExport>("/v1/itr-exports/generate", {
+    package_id: packageId,
+    profile,
+    candidate_itr: decision,
+    validation_report: validationReport,
+    tax_computation_result: taxComputation,
+  });
+}
+
+export async function downloadItrExportArtifact(exportId: string, artifact: ItrExportArtifact): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/v1/itr-exports/${exportId}/artifacts/${artifact.artifact_id}`, {
+    headers: demoAuthHeaders(),
+  });
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(toFriendlyErrorMessage("/v1/itr-exports/artifacts", response.status, errorBody));
   }
   return response.blob();
 }

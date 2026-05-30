@@ -70,5 +70,10 @@ def _counter_for(event_type: str) -> str:
         "validation_run": "validation_runs",
         "tax_computation": "tax_computations",
         "filing_package_generated": "package_generation",
+        "schema_pack_uploaded": "schema_pack_events",
+        "schema_pack_activated": "schema_pack_events",
+        "itr_export_generated": "itr_export_events",
+        "itr_export_downloaded": "itr_export_events",
+        "itr_export_validation_failed": "itr_export_events",
     }
     return counters.get(event_type, "audit_events")

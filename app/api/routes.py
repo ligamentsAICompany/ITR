@@ -24,6 +24,15 @@ from app.models.filing_package import (
     FilingPackageExplainRequest,
     FilingPackageGenerateRequest,
 )
+from app.models.itr_export import (
+    ItrExport,
+    ItrExportExplainRequest,
+    ItrExportExplanation,
+    ItrExportGenerateRequest,
+    ItrExportValidateRequest,
+    OfficialSchemaValidationResult,
+)
+from app.models.schema_pack import SchemaPack
 from app.models.tax_profile import CanonicalTaxProfile
 from app.models.tax_computation import (
     TaxComputeRequest,
@@ -38,6 +47,7 @@ from app.models.validation import (
     ValidationRunRequest,
 )
 from app.agents.filing_agent import FilingAgent
+from app.agents.itr_export_agent import ItrExportAgent
 from app.agents.tax_computation_agent import TaxComputationAgent
 from app.agents.validation_agent import ValidationAgent
 from app.core.auth import get_session_context
@@ -46,18 +56,23 @@ from app.models.auth import SessionContext
 from app.services.audit_service import AuditService
 from app.services.authorization_service import AuthorizationService
 from app.repositories.filing_package_repository import FilingPackageRepository
+from app.repositories.itr_export_repository import ItrExportRepository
+from app.repositories.schema_pack_repository import SchemaPackRepository
 from app.repositories.tax_computation_repository import TAX_COMPUTATION_CACHE, TaxComputationRepository
 from app.repositories.validation_report_repository import VALIDATION_REPORT_CACHE, ValidationReportRepository
 from app.services.document_extraction_service import DocumentExtractionService
 from app.services.document_validation_service import DocumentValidationService
 from app.services.explanation_service import explain_decision
 from app.services.filing_package_service import FilingPackageService
+from app.services.itr_export_service import ItrExportService
 from app.services.itr_service import get_missing_fields, run_itr_decision
 from app.services.normalization_service import normalize_raw_user_data
 from app.services.profile_merge_service import ProfileMergeService
 from app.services.slm_service import get_default_slm_service
 from app.services.storage_service import DocumentStorageService, get_document_storage_service
 from app.services.tax_computation_service import MissingTaxConfigError
+from app.services.schema_pack_service import SchemaPackService
+from app.models.auth import UserRole
 
 router = APIRouter()
 # Non-production compatibility caches. Durable local persistence goes through repositories.
@@ -66,6 +81,8 @@ TAX_COMPUTATIONS = TAX_COMPUTATION_CACHE
 validation_report_repository = ValidationReportRepository()
 tax_computation_repository = TaxComputationRepository()
 filing_package_repository = FilingPackageRepository()
+schema_pack_repository = SchemaPackRepository()
+itr_export_repository = ItrExportRepository()
 authorization_service = AuthorizationService()
 audit_service = AuditService()
 
@@ -76,6 +93,14 @@ def _storage_service() -> DocumentStorageService:
 
 def _filing_package_service() -> FilingPackageService:
     return FilingPackageService(repository=filing_package_repository)
+
+
+def _schema_pack_service() -> SchemaPackService:
+    return SchemaPackService(repository=schema_pack_repository)
+
+
+def _itr_export_service() -> ItrExportService:
+    return ItrExportService(repository=itr_export_repository, schema_pack_service=_schema_pack_service())
 
 
 OWNER_EXCLUDE = {"owner_user_id", "organization_id", "created_by"}
@@ -95,6 +120,93 @@ def _deny(session: SessionContext, resource_type: str, resource_id: str, request
 
 def _configuration_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=500, detail="Server persistence or storage backend is not configured for this mode")
+
+
+def _require_admin(session: SessionContext) -> None:
+    if session.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+
+@router.post("/schema-packs/upload", response_model=SchemaPack)
+async def upload_schema_pack(
+    request: Request,
+    file: UploadFile = File(...),
+    assessment_year: str | None = Form(default=None),
+    previous_year: str | None = Form(default=None),
+    itr_form: str | None = Form(default=None),
+    schema_version: str | None = Form(default=None),
+    session: SessionContext = Depends(get_session_context),
+) -> SchemaPack:
+    _require_admin(session)
+    content = await file.read()
+    try:
+        schema_pack = _schema_pack_service().upload(
+            filename=file.filename or "schema.json",
+            content=content,
+            assessment_year=assessment_year,
+            previous_year=previous_year,
+            itr_form=itr_form,
+            schema_version=schema_version,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_service.record(
+        event_type="schema_pack_uploaded",
+        session=session,
+        resource_type="schema_pack",
+        resource_id=schema_pack.schema_pack_id,
+        request=request,
+        metadata_summary={
+            "assessment_year": schema_pack.assessment_year,
+            "itr_form": schema_pack.itr_form,
+            "schema_version": schema_pack.schema_version,
+        },
+    )
+    return schema_pack
+
+
+@router.get("/schema-packs", response_model=list[SchemaPack])
+def list_schema_packs(
+    session: SessionContext = Depends(get_session_context),
+) -> list[SchemaPack]:
+    _require_admin(session)
+    return _schema_pack_service().list()
+
+
+@router.get("/schema-packs/{schema_pack_id}", response_model=SchemaPack)
+def get_schema_pack(
+    schema_pack_id: str,
+    session: SessionContext = Depends(get_session_context),
+) -> SchemaPack:
+    _require_admin(session)
+    schema_pack = _schema_pack_service().get(schema_pack_id)
+    if schema_pack is None:
+        raise HTTPException(status_code=404, detail="Schema pack not found")
+    return schema_pack
+
+
+@router.post("/schema-packs/{schema_pack_id}/activate", response_model=SchemaPack)
+def activate_schema_pack(
+    schema_pack_id: str,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> SchemaPack:
+    _require_admin(session)
+    try:
+        schema_pack = _schema_pack_service().activate(schema_pack_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if schema_pack is None:
+        raise HTTPException(status_code=404, detail="Schema pack not found")
+    audit_service.record(
+        event_type="schema_pack_activated",
+        session=session,
+        resource_type="schema_pack",
+        resource_id=schema_pack.schema_pack_id,
+        request=request,
+        metadata_summary={"assessment_year": schema_pack.assessment_year, "itr_form": schema_pack.itr_form},
+    )
+    return schema_pack
 
 
 @router.post("/normalize", response_model=CanonicalTaxProfile)
@@ -477,6 +589,165 @@ def explain_filing_package(
         resource_id=payload.package_id,
         request=request,
         metadata_summary={"kind": "filing_package"},
+    )
+    return response
+
+
+@router.post("/itr-exports/generate", response_model=ItrExport, response_model_exclude=OWNER_EXCLUDE)
+def generate_itr_export(
+    payload: ItrExportGenerateRequest,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> ItrExport:
+    package = None
+    if payload.package_id:
+        package = _filing_package_service().get(payload.package_id)
+        if package is None:
+            raise HTTPException(status_code=404, detail="Filing package not found")
+        decision = authorization_service.can_read_filing_package(session, package)
+        if not decision.allowed:
+            _deny(session, "filing_package", payload.package_id, request, decision.reason)
+    if not (payload.profile and payload.candidate_itr and payload.validation_report and payload.tax_computation_result):
+        raise HTTPException(status_code=422, detail="Profile, ITR decision, validation report, and tax computation are required")
+    export = ItrExportAgent(service=_itr_export_service()).generate_export(
+        profile=payload.profile,
+        candidate_itr=payload.candidate_itr,
+        validation_report=payload.validation_report,
+        tax_computation_result=payload.tax_computation_result,
+        package=package,
+        owner_user_id=session.user_id,
+        organization_id=session.organization_id,
+        created_by=session.user_id,
+    )
+    audit_service.record(
+        event_type="itr_export_generated",
+        session=session,
+        resource_type="itr_export",
+        resource_id=export.export_id,
+        request=request,
+        metadata_summary={"candidate_itr": export.candidate_itr, "status": export.status},
+    )
+    if export.status in {"blocked", "schema_failed", "not_configured"}:
+        audit_service.record(
+            event_type="itr_export_validation_failed",
+            session=session,
+            resource_type="itr_export",
+            resource_id=export.export_id,
+            request=request,
+            metadata_summary={"status": export.status, "error_count": len(export.validation_result.errors)},
+        )
+    return export
+
+
+@router.get("/itr-exports/{export_id}", response_model=ItrExport, response_model_exclude=OWNER_EXCLUDE)
+def get_itr_export(
+    export_id: str,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> ItrExport:
+    export = _itr_export_service().get(export_id)
+    if export is None:
+        raise HTTPException(status_code=404, detail="ITR export not found")
+    decision = authorization_service.can_read_filing_package(session, export)
+    if not decision.allowed:
+        _deny(session, "itr_export", export_id, request, decision.reason)
+    return export
+
+
+@router.get("/itr-exports/{export_id}/artifacts")
+def list_itr_export_artifacts(
+    export_id: str,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> list[dict[str, Any]]:
+    export = _itr_export_service().get(export_id)
+    if export is None:
+        raise HTTPException(status_code=404, detail="ITR export not found")
+    decision = authorization_service.can_download_artifact(session, export)
+    if not decision.allowed:
+        _deny(session, "itr_export_artifact", export_id, request, decision.reason)
+    return [artifact.model_dump(mode="json") for artifact in export.artifacts]
+
+
+@router.get("/itr-exports/{export_id}/artifacts/{artifact_id}")
+def download_itr_export_artifact(
+    export_id: str,
+    artifact_id: str,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> Response:
+    service = _itr_export_service()
+    export = service.get(export_id)
+    if export is None:
+        raise HTTPException(status_code=404, detail="ITR export not found")
+    decision = authorization_service.can_download_artifact(session, export)
+    if not decision.allowed:
+        _deny(session, "itr_export_artifact", artifact_id, request, decision.reason)
+    artifact = next((item for item in export.artifacts if item.artifact_id == artifact_id), None)
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="ITR export artifact not found")
+    content = service.get_artifact_content(export_id, artifact_id)
+    if content is None:
+        raise HTTPException(status_code=404, detail="ITR export artifact not found")
+    audit_service.record(
+        event_type="itr_export_downloaded",
+        session=session,
+        resource_type="itr_export_artifact",
+        resource_id=artifact_id,
+        request=request,
+        metadata_summary={"export_id": export_id, "artifact_type": artifact.artifact_type},
+    )
+    return Response(
+        content=content,
+        media_type=artifact.mime_type,
+        headers={"Content-Disposition": f'attachment; filename="{artifact.filename}"'},
+    )
+
+
+@router.post("/itr-exports/validate", response_model=OfficialSchemaValidationResult)
+def validate_itr_export(
+    payload: ItrExportValidateRequest,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> OfficialSchemaValidationResult:
+    result = _itr_export_service().validate_only(
+        profile=payload.profile,
+        candidate_itr=payload.candidate_itr,
+        validation_report=payload.validation_report,
+        tax_computation_result=payload.tax_computation_result,
+    )
+    audit_service.record(
+        event_type="itr_export_validation_run",
+        session=session,
+        resource_type="itr_export_validation",
+        resource_id=result.validation_id,
+        request=request,
+        metadata_summary={"candidate_itr": result.candidate_itr, "status": result.status},
+    )
+    return result
+
+
+@router.post("/itr-exports/explain", response_model=ItrExportExplanation)
+def explain_itr_export(
+    payload: ItrExportExplainRequest,
+    request: Request,
+    session: SessionContext = Depends(get_session_context),
+) -> ItrExportExplanation:
+    service = _itr_export_service()
+    export = service.get(payload.export_id)
+    if export is None:
+        raise HTTPException(status_code=404, detail="ITR export not found")
+    decision = authorization_service.can_read_filing_package(session, export)
+    if not decision.allowed:
+        _deny(session, "itr_export", payload.export_id, request, decision.reason)
+    response = ItrExportAgent(service=service).explain(export)
+    audit_service.record(
+        event_type="explanation_generated",
+        session=session,
+        resource_type="itr_export",
+        resource_id=payload.export_id,
+        request=request,
+        metadata_summary={"kind": "itr_export"},
     )
     return response
 
