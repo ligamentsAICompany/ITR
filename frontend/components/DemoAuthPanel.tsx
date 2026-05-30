@@ -4,15 +4,19 @@ import { useEffect, useState } from "react";
 import { DEMO_USERS, getDemoAuthContext, isDemoAuthEnabled, setDemoAuthContext } from "../lib/auth";
 import type { DemoAuthContext } from "../lib/auth";
 
-export function DemoAuthPanel() {
+export function DemoAuthPanel({ onContextChange }: { onContextChange?: (context: DemoAuthContext) => void }) {
   const [context, setContext] = useState<DemoAuthContext>(DEMO_USERS[0]);
 
   useEffect(() => {
     if (isDemoAuthEnabled()) {
-      const timer = window.setTimeout(() => setContext(getDemoAuthContext()), 0);
+      const timer = window.setTimeout(() => {
+        const storedContext = getDemoAuthContext();
+        setContext(storedContext);
+        onContextChange?.(storedContext);
+      }, 0);
       return () => window.clearTimeout(timer);
     }
-  }, []);
+  }, [onContextChange]);
 
   if (!isDemoAuthEnabled()) {
     return (
@@ -37,7 +41,11 @@ export function DemoAuthPanel() {
           <select
             className="rounded-xl border border-emerald-300 bg-white px-3 py-2 text-sm font-medium normal-case tracking-normal text-emerald-950"
             value={context.userId}
-            onChange={(event) => setContext(setDemoAuthContext(event.target.value))}
+            onChange={(event) => {
+              const selectedContext = setDemoAuthContext(event.target.value);
+              setContext(selectedContext);
+              onContextChange?.(selectedContext);
+            }}
           >
             {DEMO_USERS.map((user) => (
               <option key={user.userId} value={user.userId}>

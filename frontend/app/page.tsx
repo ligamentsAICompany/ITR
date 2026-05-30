@@ -160,6 +160,7 @@ export default function Home() {
   const [filingApproval, setFilingApproval] = useState<FilingApproval | null>(null);
   const [acknowledgement, setAcknowledgement] = useState<Acknowledgement | null>(null);
   const [filingWorkflowError, setFilingWorkflowError] = useState<string | null>(null);
+  const [demoAuthContext, setDemoAuthContextState] = useState(() => getDemoAuthContext());
 
   const questions = useMemo(
     () => (clarification?.question ? [clarification.question] : []),
@@ -696,7 +697,7 @@ export default function Home() {
     void runWorkflow(nextForm, { resetLogs: false, unresolvedFields: nextUnresolvedFields });
   }
 
-  const currentDemoRole = getDemoAuthContext().role;
+  const currentDemoRole = demoAuthContext.role;
   const canApproveFiling = currentDemoRole === "reviewer" || currentDemoRole === "admin";
 
   return (
@@ -711,7 +712,7 @@ export default function Home() {
         </section>
 
         <div className="space-y-6">
-          <DemoAuthPanel />
+          <DemoAuthPanel onContextChange={setDemoAuthContextState} />
           <DocumentUploadCenter
             disabled={loading}
             onExtracted={handleExtraction}
