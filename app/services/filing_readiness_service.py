@@ -93,6 +93,7 @@ class FilingReadinessService:
                 blockers.append("live_filing_disabled")
             else:
                 blockers.append("provider_not_configured")
+            blockers.extend(provider_config.missing)
         if provider_config.provider_mode in {"mock", "sandbox"}:
             warnings.append("This is a mock/sandbox filing workflow for testing. It does not file a real tax return.")
 

@@ -440,6 +440,16 @@ export type ProviderDiagnostics = {
   mode: ProviderMode;
   configured: boolean;
   live_filing_enabled: boolean;
+  secret_backend: "env" | "gcp_secret_manager" | string;
+  sandbox_configured: boolean;
+  sandbox_calls_allowed: boolean;
+  sandbox_contract_status: "passed" | "failed" | "not_verified" | string;
+  last_sandbox_contract_test_at?: string | null;
+  live_configured: boolean;
+  live_enabled: boolean;
+  live_blocked_reason?: string | null;
+  provider_capabilities: string[];
+  safe_missing_config: string[];
   supported_operations: string[];
   status?: string;
   safe_readiness: string;

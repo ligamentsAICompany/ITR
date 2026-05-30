@@ -93,6 +93,8 @@ from app.services.tax_computation_service import MissingTaxConfigError
 from app.services.schema_pack_service import SchemaPackService
 from app.services.provider_diagnostics_service import ProviderDiagnostics, ProviderDiagnosticsService
 from app.services.provider_status_mapper import ProviderStatusMapper
+from app.services.provider_credentials_service import ProviderCredentialsService
+from app.models.provider_integration import ProviderMode
 from app.models.auth import UserRole
 
 router = APIRouter()
@@ -792,9 +794,11 @@ def _filing_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=400, detail=str(exc))
 
 
-def _verify_provider_callback_signature(*, body: bytes, signature: str | None, timestamp: str | None = None, nonce: str | None = None) -> bool:
+def _verify_provider_callback_signature(*, provider: str, body: bytes, signature: str | None, timestamp: str | None = None, nonce: str | None = None) -> bool:
     settings = get_settings()
-    secret = settings.eri_client_secret
+    mode = ProviderMode.SANDBOX if provider == "eri_sandbox" else ProviderMode.LIVE if provider == "eri_live" else ProviderMode.MOCK
+    credentials = ProviderCredentialsService().load(mode=mode) if mode != ProviderMode.MOCK else None
+    secret = credentials.client_secret if credentials and credentials.client_secret else settings.eri_client_secret
     if not secret:
         return not settings.is_production or settings.allow_unsigned_provider_callbacks
     if not signature:
@@ -837,6 +841,7 @@ async def provider_callback(provider: str, request: Request) -> ProviderCallback
     timestamp = request.headers.get("X-Provider-Timestamp")
     nonce = request.headers.get("X-Provider-Nonce")
     verified = _verify_provider_callback_signature(
+        provider=provider,
         body=body,
         signature=request.headers.get("X-Provider-Signature"),
         timestamp=timestamp,

@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.config import get_settings
 from app.models.provider_spec import AuthType, ProviderSpec, SignatureType
+from app.services.provider_credentials_service import ProviderCredentialsService
 from app.services.provider_error_mapper import sanitize_provider_text
 
 
@@ -30,12 +31,14 @@ class ProviderSigningService:
         if spec.provider_mode == "mock" or (spec.auth_type == AuthType.NONE and spec.signature_type == SignatureType.NONE):
             return ProviderSigningResult(success=True, headers=outgoing, audit_metadata={"signature_type": "none"})
         settings = get_settings()
+        credentials = ProviderCredentialsService().load(mode=spec.provider_mode)
+        client_secret = credentials.client_secret or settings.eri_client_secret
         if spec.auth_type == AuthType.BEARER_TOKEN or spec.signature_type == SignatureType.BEARER_TOKEN:
-            if not settings.eri_client_secret:
+            if not client_secret:
                 return self._missing()
             outgoing["Authorization"] = "Bearer [configured]"
         elif spec.auth_type == AuthType.CLIENT_SECRET or spec.signature_type == SignatureType.CLIENT_SECRET:
-            if not settings.eri_client_secret:
+            if not client_secret:
                 return self._missing()
             outgoing["X-Client-Secret-Configured"] = "true"
         elif spec.auth_type == AuthType.MUTUAL_TLS or spec.signature_type == SignatureType.MUTUAL_TLS:
@@ -43,9 +46,9 @@ class ProviderSigningService:
                 return self._missing()
             outgoing["X-MTLS-Configured"] = "true"
         if spec.signature_type == SignatureType.HMAC_SIGNATURE:
-            if not settings.eri_client_secret:
+            if not client_secret:
                 return self._missing()
-            digest = hmac.new(settings.eri_client_secret.encode(), body, hashlib.sha256).hexdigest()
+            digest = hmac.new(client_secret.encode(), body, hashlib.sha256).hexdigest()
             outgoing["X-Provider-Signature"] = f"sha256={digest}"
         elif spec.signature_type == SignatureType.RSA_SIGNATURE:
             if not settings.eri_private_key_secret_name:

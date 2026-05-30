@@ -31,14 +31,27 @@ class Settings:
     next_public_api_base_url: str | None
     filing_provider: str
     filing_provider_mode: str
+    secret_backend: str
+    gcp_project_id: str | None
+    allow_sandbox_provider_calls: bool
     allow_live_filing: bool
+    live_filing_approval_ticket: str | None
+    live_filing_approved_by: str | None
+    live_filing_approved_at: str | None
     eri_client_id: str | None
     eri_client_secret: str | None
+    eri_client_id_secret_name: str | None
+    eri_client_secret_secret_name: str | None
+    eri_private_key_secret_name: str | None
+    eri_cert_secret_name: str | None
+    eri_sandbox_client_id_secret_name: str | None
+    eri_sandbox_client_secret_secret_name: str | None
+    eri_sandbox_private_key_secret_name: str | None
+    eri_sandbox_cert_secret_name: str | None
     eri_base_url: str | None
     eri_token_url: str | None
     eri_callback_url: str | None
     eri_cert_path: str | None
-    eri_private_key_secret_name: str | None
     eri_timeout_seconds: int
     eri_retry_count: int
     eri_retry_backoff_seconds: float
@@ -82,14 +95,32 @@ class Settings:
         self.filing_provider = getenv("FILING_PROVIDER", "mock").lower()
         provider_default_mode = {"eri_sandbox": "sandbox", "eri_live": "live"}.get(self.filing_provider, self.filing_provider)
         self.filing_provider_mode = getenv("FILING_PROVIDER_MODE", provider_default_mode).lower()
+        self.secret_backend = getenv("SECRET_BACKEND", "env").lower()
+        self.gcp_project_id = getenv("GCP_PROJECT_ID") or None
+        self.allow_sandbox_provider_calls = getenv("ALLOW_SANDBOX_PROVIDER_CALLS", "false").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         self.allow_live_filing = getenv("ALLOW_LIVE_FILING", "false").lower() in {"1", "true", "yes", "on"}
+        self.live_filing_approval_ticket = getenv("LIVE_FILING_APPROVAL_TICKET") or None
+        self.live_filing_approved_by = getenv("LIVE_FILING_APPROVED_BY") or None
+        self.live_filing_approved_at = getenv("LIVE_FILING_APPROVED_AT") or None
         self.eri_client_id = getenv("ERI_CLIENT_ID") or None
         self.eri_client_secret = getenv("ERI_CLIENT_SECRET") or None
+        self.eri_client_id_secret_name = getenv("ERI_CLIENT_ID_SECRET_NAME") or None
+        self.eri_client_secret_secret_name = getenv("ERI_CLIENT_SECRET_SECRET_NAME") or None
+        self.eri_private_key_secret_name = getenv("ERI_PRIVATE_KEY_SECRET_NAME") or None
+        self.eri_cert_secret_name = getenv("ERI_CERT_SECRET_NAME") or None
+        self.eri_sandbox_client_id_secret_name = getenv("ERI_SANDBOX_CLIENT_ID_SECRET_NAME") or None
+        self.eri_sandbox_client_secret_secret_name = getenv("ERI_SANDBOX_CLIENT_SECRET_SECRET_NAME") or None
+        self.eri_sandbox_private_key_secret_name = getenv("ERI_SANDBOX_PRIVATE_KEY_SECRET_NAME") or None
+        self.eri_sandbox_cert_secret_name = getenv("ERI_SANDBOX_CERT_SECRET_NAME") or None
         self.eri_base_url = getenv("ERI_BASE_URL") or None
         self.eri_token_url = getenv("ERI_TOKEN_URL") or None
         self.eri_callback_url = getenv("ERI_CALLBACK_URL") or None
         self.eri_cert_path = getenv("ERI_CERT_PATH") or None
-        self.eri_private_key_secret_name = getenv("ERI_PRIVATE_KEY_SECRET_NAME") or None
         self.eri_timeout_seconds = int(getenv("ERI_TIMEOUT_SECONDS", "10"))
         self.eri_retry_count = int(getenv("ERI_RETRY_COUNT", "2"))
         self.eri_retry_backoff_seconds = float(getenv("ERI_RETRY_BACKOFF_SECONDS", "1"))
@@ -113,6 +144,10 @@ class Settings:
     def is_production(self) -> bool:
         return self.environment == "production"
 
+    @property
+    def live_filing_approval_complete(self) -> bool:
+        return bool(self.live_filing_approval_ticket and self.live_filing_approved_by and self.live_filing_approved_at)
+
     def validate_startup(self) -> None:
         errors: list[str] = []
         if self.environment not in {"development", "test", "production"}:
@@ -127,8 +162,12 @@ class Settings:
             errors.append("FILING_PROVIDER must be mock, eri_sandbox, or eri_live")
         if self.filing_provider_mode not in {"mock", "sandbox", "live"}:
             errors.append("FILING_PROVIDER_MODE must be mock, sandbox, or live")
+        if self.secret_backend not in {"env", "gcp_secret_manager"}:
+            errors.append("SECRET_BACKEND must be env or gcp_secret_manager")
         if self.mock_filing_outcome not in {"success", "failure", "pending"}:
             errors.append("MOCK_FILING_OUTCOME must be success, failure, or pending")
+        if self.allow_live_filing and not self.live_filing_approval_complete:
+            errors.append("LIVE_FILING_APPROVAL_TICKET, LIVE_FILING_APPROVED_BY, and LIVE_FILING_APPROVED_AT are required when ALLOW_LIVE_FILING=true")
         if self.persistence_backend == "postgres" and not self.database_url:
             errors.append("DATABASE_URL is required when PERSISTENCE_BACKEND=postgres")
         if self.storage_backend == "gcs" and not self.gcs_bucket_name:

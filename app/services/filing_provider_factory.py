@@ -13,6 +13,7 @@ class FilingProviderConfiguration:
     configured: bool
     live_allowed: bool
     error: str | None = None
+    missing: tuple[str, ...] = ()
 
 
 def get_filing_provider_configuration() -> FilingProviderConfiguration:
@@ -23,6 +24,7 @@ def get_filing_provider_configuration() -> FilingProviderConfiguration:
         configured=config.configured,
         live_allowed=config.live_allowed,
         error=config.safe_error,
+        missing=config.missing,
     )
 
 

@@ -59,7 +59,12 @@ Production deployments must set these backend runtime values:
 - `MAX_UPLOAD_BYTES=10485760` or the approved upload limit
 - `FILING_PROVIDER=mock` unless an approved ERI sandbox/live rollout is being tested
 - `FILING_PROVIDER_MODE=mock`, `sandbox`, or `live`
+- `SECRET_BACKEND=env` for local/demo or `SECRET_BACKEND=gcp_secret_manager` for Cloud Run
+- `GCP_PROJECT_ID=<project>` when `SECRET_BACKEND=gcp_secret_manager`
+- `ALLOW_SANDBOX_PROVIDER_CALLS=false` unless controlled sandbox execution is approved
 - `ALLOW_LIVE_FILING=false` unless live filing has explicit written approval
+- `LIVE_FILING_APPROVAL_TICKET`, `LIVE_FILING_APPROVED_BY`, and
+  `LIVE_FILING_APPROVED_AT` when `ALLOW_LIVE_FILING=true`
 
 Do not deploy production with `AUTH_MODE=demo` unless a temporary controlled
 acceptance environment explicitly sets `ALLOW_DEMO_AUTH_IN_PRODUCTION=true`.
@@ -69,27 +74,37 @@ localhost public API URLs.
 
 ## ERI Provider Configuration
 
-Phase 10 prepares ERI sandbox readiness without enabling live filing by default.
+Phase 11 adds controlled ERI sandbox execution without enabling live filing by default.
 Mock filing remains the default and live filing is blocked unless all of these
 are true:
 
 - `FILING_PROVIDER=eri_live`
 - `FILING_PROVIDER_MODE=live`
 - `ALLOW_LIVE_FILING=true`
+- `LIVE_FILING_APPROVAL_TICKET`, `LIVE_FILING_APPROVED_BY`, and
+  `LIVE_FILING_APPROVED_AT` are set
 - `ENVIRONMENT=production`
 - All required ERI configuration values are present
 
 Sandbox mode uses `FILING_PROVIDER=eri_sandbox` and
 `FILING_PROVIDER_MODE=sandbox`. Sandbox/live modes require an active provider
-spec plus Secret Manager-backed credentials. The adapter still avoids real ERI
-network calls unless official transport is explicitly implemented and approved.
+spec plus Secret Manager-backed credentials. Sandbox provider calls are blocked
+unless `ALLOW_SANDBOX_PROVIDER_CALLS=true`; live provider calls remain blocked
+unless the live approval metadata is complete and `ALLOW_LIVE_FILING=true`.
 Tests must not call live government or ERI endpoints.
 
 Store provider secrets in Secret Manager, not in source files or `.env`
 commits:
 
 - `ERI_CLIENT_SECRET`
+- `ERI_CLIENT_ID_SECRET_NAME`
+- `ERI_CLIENT_SECRET_SECRET_NAME`
 - `ERI_PRIVATE_KEY_SECRET_NAME`
+- `ERI_CERT_SECRET_NAME`
+- `ERI_SANDBOX_CLIENT_ID_SECRET_NAME`
+- `ERI_SANDBOX_CLIENT_SECRET_SECRET_NAME`
+- `ERI_SANDBOX_PRIVATE_KEY_SECRET_NAME`
+- `ERI_SANDBOX_CERT_SECRET_NAME`
 - certificate/private-key material referenced by `ERI_CERT_PATH` or a future
   provider-specific secret
 
@@ -121,31 +136,45 @@ policy.
    operations, auth type, signature type, payload format, and status mapping
    version.
 2. Store sandbox credentials in Secret Manager or environment-backed secrets:
-   `ERI_CLIENT_ID`, `ERI_CLIENT_SECRET`, and any certificate/private-key secret
-   reference required by the approved provider spec.
+   `ERI_SANDBOX_CLIENT_ID_SECRET_NAME`,
+   `ERI_SANDBOX_CLIENT_SECRET_SECRET_NAME`, and any certificate/private-key
+   secret reference required by the approved provider spec. For local demo only,
+   `SECRET_BACKEND=env` reads those secret-name values as environment variable
+   names.
 3. Keep `ALLOW_LIVE_FILING=false`.
-4. Run provider contract tests. If real sandbox credentials are unavailable,
+4. Set `ALLOW_SANDBOX_PROVIDER_CALLS=true` only for controlled sandbox execution.
+5. Run provider contract tests. If real sandbox credentials are unavailable,
    the result must remain `NOT VERIFIED`; do not mark real provider contracts
    as passed.
-5. Verify `/v1/filing/provider-diagnostics` shows safe fields only and does not
+6. Verify `/v1/filing/provider-diagnostics` shows safe fields only and does not
    include raw provider payloads, PAN/Aadhaar, credentials, or internal paths.
 
-### Live Filing Enablement Checklist
+### Live Rollout Control Checklist
 
 Live filing cannot be enabled until every item below is complete:
 
+- Signed provider/ERI agreement complete.
 - Legal approval complete.
-- Provider agreement complete.
-- Credentials provisioned in Secret Manager.
-- Active live provider spec approved.
-- Sandbox contract tests pass against approved credentials.
-- Callback signature verification enabled and fail-closed in production.
-- Monitoring and safe provider diagnostics configured.
-- Rollback plan approved.
+- Compliance approval complete.
 - Senior engineering approval complete.
+- Production credentials and signing material provisioned in Secret Manager.
+- Cloud Run service account has secret access scoped to the required provider
+  secrets only.
+- Active live provider spec approved.
+- Callback signature verification enabled and fail-closed in production.
+- Sandbox contract tests passed against approved credentials.
+- Monitoring and alerting configured.
+- Rollback tested.
+- Incident owner assigned.
+- `LIVE_FILING_APPROVAL_TICKET`, `LIVE_FILING_APPROVED_BY`, and
+  `LIVE_FILING_APPROVED_AT` set to the approved rollout record.
 - `ALLOW_LIVE_FILING=true`, `FILING_PROVIDER=eri_live`,
   `FILING_PROVIDER_MODE=live`, and `ENVIRONMENT=production` are set only for
   the approved production rollout.
+
+If `ALLOW_LIVE_FILING=true` is set without the approval metadata above, startup
+fails safely. Diagnostics also report live filing as disabled until the approval
+metadata and provider configuration are complete.
 
 ### Secret Manager Requirements
 

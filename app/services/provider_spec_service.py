@@ -6,6 +6,7 @@ from app.core.config import get_settings
 from app.models.provider_integration import ProviderCapability, ProviderMode
 from app.models.provider_spec import ProviderSpec
 from app.repositories.provider_spec_repository import ProviderSpecRepository
+from app.services.provider_credentials_service import ProviderCredentialsService
 
 
 @dataclass(frozen=True)
@@ -29,7 +30,7 @@ class ProviderSpecService:
         settings = get_settings()
         provider = _normalize_provider(settings.filing_provider)
         mode = _normalize_mode(settings.filing_provider_mode, provider)
-        live_allowed = bool(settings.allow_live_filing)
+        live_allowed = bool(settings.allow_live_filing and settings.live_filing_approval_complete)
         if provider == "mock":
             return ProviderSpecReadiness(
                 provider="mock",
@@ -66,15 +67,25 @@ class ProviderSpecService:
                 supported_operations=tuple(spec.supported_operations),
                 missing=tuple(missing),
             )
+        if mode == ProviderMode.SANDBOX and not settings.allow_sandbox_provider_calls:
+            return ProviderSpecReadiness(
+                provider=provider,
+                mode=mode.value,
+                configured=False,
+                live_allowed=live_allowed,
+                status="blocked",
+                safe_error="Sandbox provider calls are disabled",
+                spec=spec,
+                supported_operations=tuple(spec.supported_operations),
+                missing=("sandbox_provider_calls_disabled",),
+            )
         return ProviderSpecReadiness(provider=provider, mode=mode.value, configured=True, live_allowed=live_allowed, status="configured", spec=spec, supported_operations=tuple(spec.supported_operations))
 
 
 def _missing_secure_config(mode: ProviderMode) -> list[str]:
     settings = get_settings()
-    required = [
-        ("ERI_CLIENT_ID", settings.eri_client_id),
-        ("ERI_CLIENT_SECRET", settings.eri_client_secret),
-    ]
+    credentials = ProviderCredentialsService().load(mode=mode)
+    required = [(name, None) for name in credentials.missing]
     if mode == ProviderMode.LIVE:
         required.extend(
             [

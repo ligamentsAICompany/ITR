@@ -7,6 +7,7 @@ from app.models.provider_integration import ProviderCapability, ProviderMode
 from app.services.eri_client import EriClient
 from app.services.eri_provider import EriProvider
 from app.services.mock_filing_provider import MockFilingProvider
+from app.services.provider_credentials_service import ProviderCredentialsService
 from app.services.provider_spec_service import ProviderSpecService
 
 
@@ -19,13 +20,14 @@ class EriProviderConfiguration:
     safe_error: str | None = None
     missing: tuple[str, ...] = ()
     capabilities: tuple[ProviderCapability, ...] = field(default_factory=tuple)
+    sandbox_calls_allowed: bool = False
 
 
 def get_eri_provider_configuration() -> EriProviderConfiguration:
     settings = get_settings()
     provider = _normalize_provider(getattr(settings, "filing_provider", "mock"))
     mode = _normalize_mode(getattr(settings, "filing_provider_mode", provider))
-    live_allowed = bool(getattr(settings, "allow_live_filing", False))
+    live_allowed = bool(getattr(settings, "allow_live_filing", False) and getattr(settings, "live_filing_approval_complete", False))
     capabilities = (
         ProviderCapability.SUBMIT_RETURN,
         ProviderCapability.STATUS_CHECK,
@@ -34,7 +36,7 @@ def get_eri_provider_configuration() -> EriProviderConfiguration:
         ProviderCapability.CALLBACK,
     )
     if provider == "mock":
-        return EriProviderConfiguration("mock", ProviderMode.MOCK, True, live_allowed, capabilities=capabilities)
+        return EriProviderConfiguration("mock", ProviderMode.MOCK, True, live_allowed, capabilities=capabilities, sandbox_calls_allowed=settings.allow_sandbox_provider_calls)
     spec_readiness = ProviderSpecService().readiness_for_current_provider()
     spec_capabilities = tuple(
         ProviderCapability(item)
@@ -42,8 +44,8 @@ def get_eri_provider_configuration() -> EriProviderConfiguration:
         if item in {capability.value for capability in ProviderCapability}
     )
     if not spec_readiness.configured:
-        return EriProviderConfiguration(provider, mode, False, live_allowed, spec_readiness.safe_error, spec_readiness.missing, spec_capabilities)
-    return EriProviderConfiguration(provider, mode, True, live_allowed, capabilities=spec_capabilities)
+        return EriProviderConfiguration(provider, mode, False, live_allowed, spec_readiness.safe_error, spec_readiness.missing, spec_capabilities, settings.allow_sandbox_provider_calls)
+    return EriProviderConfiguration(provider, mode, True, live_allowed, capabilities=spec_capabilities, sandbox_calls_allowed=settings.allow_sandbox_provider_calls)
 
 
 def get_eri_provider():
@@ -53,14 +55,18 @@ def get_eri_provider():
     if config.mode == ProviderMode.MOCK:
         return MockFilingProvider(provider_mode="mock")
     settings = get_settings()
+    credentials = ProviderCredentialsService().load(mode=config.mode)
     client = EriClient(
         base_url=getattr(settings, "eri_base_url", None),
         token_url=getattr(settings, "eri_token_url", None),
         timeout_seconds=getattr(settings, "eri_timeout_seconds", 10),
         retry_count=getattr(settings, "eri_retry_count", 2),
-        allow_network=False,
+        allow_network=config.mode == ProviderMode.SANDBOX and settings.allow_sandbox_provider_calls,
+        mode=config.mode,
+        client_id=credentials.client_id,
+        client_secret=credentials.client_secret,
     )
-    return EriProvider(mode=config.mode, client=client, sandbox_mocked=config.mode == ProviderMode.SANDBOX)
+    return EriProvider(mode=config.mode, client=client, sandbox_mocked=False, capabilities=config.capabilities)
 
 
 def _normalize_provider(provider: str) -> str:

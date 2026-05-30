@@ -154,6 +154,16 @@ describe("filing integration UI", () => {
             mode: "sandbox",
             configured: false,
             live_filing_enabled: false,
+            secret_backend: "env",
+            sandbox_configured: false,
+            sandbox_calls_allowed: false,
+            sandbox_contract_status: "not_verified",
+            last_sandbox_contract_test_at: "2026-05-30T00:00:00Z",
+            live_configured: false,
+            live_enabled: false,
+            live_blocked_reason: "Live filing is disabled until approval metadata and ALLOW_LIVE_FILING are configured.",
+            provider_capabilities: ["submit_return", "status_check", "callback"],
+            safe_missing_config: ["ERI_SANDBOX_CLIENT_ID", "sandbox_provider_calls_disabled"],
             supported_operations: ["submit_return", "status_check", "callback"],
             safe_readiness: "not_configured",
             last_contract_test: {
@@ -189,6 +199,56 @@ describe("filing integration UI", () => {
     assert.match(html, /retryable/i);
     assert.match(html, /e-verification unsupported/i);
     assert.match(html, /acknowledgement unavailable/i);
+    assert.match(html, /sandbox calls disabled/i);
+    assert.match(html, /sandbox contract/i);
+    assert.match(html, /live disabled reason/i);
+    assert.match(html, /ERI_SANDBOX_CLIENT_ID/i);
     assert.doesNotMatch(html, /client_secret|access token|raw payload/i);
+  });
+
+  it("renders sandbox configured diagnostics without leaking secrets", () => {
+    const html = renderToStaticMarkup(
+      <ProviderStatusPanel
+        readiness={{
+          ready: true,
+          blockers: [],
+          warnings: ["Sandbox submission only. This is not a real tax filing."],
+          required_actions: [],
+          provider: "eri_sandbox",
+          provider_mode: "sandbox",
+        }}
+        submission={{ ...submission, provider: "eri_sandbox", provider_mode: "sandbox", submission_status: "submitted" }}
+        diagnostics={{
+          provider: "eri_sandbox",
+          mode: "sandbox",
+          configured: true,
+          live_filing_enabled: false,
+          secret_backend: "gcp_secret_manager",
+          sandbox_configured: true,
+          sandbox_calls_allowed: true,
+          sandbox_contract_status: "passed",
+          last_sandbox_contract_test_at: "2026-05-30T00:00:00Z",
+          live_configured: false,
+          live_enabled: false,
+          live_blocked_reason: "Live filing remains disabled for Phase 11.",
+          provider_capabilities: ["submit_return", "status_check", "callback"],
+          safe_missing_config: [],
+          supported_operations: ["submit_return", "status_check", "callback"],
+          safe_readiness: "configured",
+          last_contract_test: { status: "passed", tested_at: "2026-05-30T00:00:00Z" },
+          retryable_provider_error: null,
+          last_status_check: null,
+        }}
+        everificationSupported={false}
+        acknowledgementAvailable={false}
+      />,
+    );
+
+    assert.match(html, /Sandbox submission only\. This is not a real tax filing\./);
+    assert.match(html, /sandbox configured/i);
+    assert.match(html, /sandbox calls enabled/i);
+    assert.match(html, /gcp secret manager/i);
+    assert.match(html, /submit return/i);
+    assert.doesNotMatch(html, /sandbox-secret|client_secret|access token|raw payload/i);
   });
 });

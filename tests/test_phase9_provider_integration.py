@@ -155,6 +155,9 @@ def test_live_enabled_without_credentials_blocks_provider_call(monkeypatch):
     monkeypatch.setenv("FILING_PROVIDER", "eri_live")
     monkeypatch.setenv("FILING_PROVIDER_MODE", "live")
     monkeypatch.setenv("ALLOW_LIVE_FILING", "true")
+    monkeypatch.setenv("LIVE_FILING_APPROVAL_TICKET", "LEGAL-123")
+    monkeypatch.setenv("LIVE_FILING_APPROVED_BY", "senior-engineer")
+    monkeypatch.setenv("LIVE_FILING_APPROVED_AT", "2026-05-30T00:00:00Z")
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.delenv("ERI_CLIENT_ID", raising=False)
     monkeypatch.delenv("ERI_CLIENT_SECRET", raising=False)
@@ -183,7 +186,7 @@ def test_provider_error_mapping_redacts_credentials_pan_and_aadhaar():
     assert "AB****4F" in mapped.audit_message
 
 
-def test_sandbox_provider_submit_status_everification_and_ack_are_mocked(monkeypatch):
+def test_sandbox_provider_calls_disabled_blocks_adapter(monkeypatch):
     monkeypatch.setenv("FILING_PROVIDER", "eri_sandbox")
     monkeypatch.setenv("FILING_PROVIDER_MODE", "sandbox")
     monkeypatch.setenv("ERI_BASE_URL", "https://sandbox.invalid")
@@ -193,33 +196,16 @@ def test_sandbox_provider_submit_status_everification_and_ack_are_mocked(monkeyp
     get_settings.cache_clear()
     save_active_provider_spec()
 
-    from app.services.eri_provider_factory import get_eri_provider
+    config = get_eri_provider_configuration()
 
-    provider = get_eri_provider()
-    auth_response = provider.authenticate()
-    submit_response = provider.submit_return(package_id="pkg-12345678", export_id="exp-12345678", payload=b'{"safe":true}')
-    status_response = provider.get_submission_status(provider_reference_id=submit_response.provider_reference_id or "")
-    everify_response = provider.initiate_everification(provider_reference_id=submit_response.provider_reference_id or "")
-    ack_response = provider.get_acknowledgement(provider_reference_id=submit_response.provider_reference_id or "")
-
-    assert auth_response.success is True
-    assert submit_response.provider_reference_id
-    assert submit_response.normalized_status == SubmissionStatus.SUBMITTED
-    assert status_response.normalized_status == SubmissionStatus.ACKNOWLEDGEMENT_AVAILABLE
-    assert everify_response.safe_message
-    assert ack_response.acknowledgement_number is None
-    assert ack_response.normalized_status == SubmissionStatus.ACKNOWLEDGEMENT_AVAILABLE
+    assert config.configured is False
+    assert "sandbox_provider_calls_disabled" in config.missing
 
 
 def test_provider_status_polling_updates_submission_and_audits(monkeypatch):
-    monkeypatch.setenv("FILING_PROVIDER", "eri_sandbox")
-    monkeypatch.setenv("FILING_PROVIDER_MODE", "sandbox")
-    monkeypatch.setenv("ERI_BASE_URL", "https://sandbox.invalid")
-    monkeypatch.setenv("ERI_TOKEN_URL", "https://sandbox.invalid/token")
-    monkeypatch.setenv("ERI_CLIENT_ID", "sandbox-client")
-    monkeypatch.setenv("ERI_CLIENT_SECRET", "sandbox-secret")
+    monkeypatch.setenv("FILING_PROVIDER", "mock")
+    monkeypatch.setenv("FILING_PROVIDER_MODE", "mock")
     get_settings.cache_clear()
-    save_active_provider_spec()
 
     package, export = save_package_and_export()
     submission = FilingSubmission(
@@ -227,9 +213,9 @@ def test_provider_status_polling_updates_submission_and_audits(monkeypatch):
         export_id=export.export_id,
         owner_user_id=USER_A,
         organization_id=ORG_A,
-        provider="eri_sandbox",
-        provider_mode="sandbox",
-        provider_reference_id="ERI-SANDBOX-1234",
+        provider="mock",
+        provider_mode="mock",
+        provider_reference_id="MOCK-1234",
         submission_status=SubmissionStatus.SUBMITTED,
     )
     FILING_SUBMISSION_CACHE[submission.submission_id] = submission
