@@ -58,6 +58,23 @@ const baseForm: BasicFormState = {
 };
 
 describe("workflow validation", () => {
+  it("allows the minimum valid demo profile to continue to workflow endpoints", () => {
+    assert.equal(
+      validateWorkflowInput({
+        ...baseForm,
+        pan: "ABCDE1234F",
+        aadhaar: "123456789012",
+        entityType: "individual",
+        residency: "resident",
+        salaryIncome: "1000000",
+        grossSalary: "1000000",
+        previousYear: "2025-26",
+        returnFilingReason: "mandatory",
+      }),
+      null,
+    );
+  });
+
   it("blocks invalid PAN before workflow endpoints are called", () => {
     assert.equal(validateWorkflowInput({ ...baseForm, pan: "ABCDE12345" }), "Please enter a valid PAN (e.g., ABCDE1234F).");
   });

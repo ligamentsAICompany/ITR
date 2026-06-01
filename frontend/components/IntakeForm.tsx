@@ -1,5 +1,5 @@
 import type { BasicFormState, YesNoUnknown } from "@/types/itr";
-import { AADHAAR_INPUT_MAX_LENGTH } from "@/lib/aadhaar";
+import { AADHAAR_INPUT_MAX_LENGTH } from "../lib/aadhaar";
 
 type IntakeFormProps = {
   form: BasicFormState;
@@ -436,6 +436,7 @@ export function IntakeForm({
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <button
           type="button"
+          data-testid="run-agent-workflow"
           disabled={disabled}
           onClick={onSubmit}
           className="cursor-pointer rounded-lg bg-[#22c55e] px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-[#22c55e]/30 disabled:cursor-not-allowed disabled:opacity-70"

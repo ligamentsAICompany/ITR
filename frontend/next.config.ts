@@ -1,12 +1,10 @@
 import type { NextConfig } from "next";
+import { resolveBackendInternalUrl } from "./lib/apiRouting";
 
 const nextConfig: NextConfig = {
   output: "standalone",
   async rewrites() {
-    const backendUrl = process.env.BACKEND_INTERNAL_URL;
-    if (!backendUrl) {
-      return [];
-    }
+    const backendUrl = resolveBackendInternalUrl(process.env.BACKEND_INTERNAL_URL);
     return [
       {
         source: "/v1/:path*",
