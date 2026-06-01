@@ -1,4 +1,4 @@
-# Production Deployment
+# Deployment
 
 ## Single-Container Cloud Run Deployment
 
@@ -19,6 +19,47 @@ Open:
 
 - Frontend: `http://localhost:8080`
 - Backend health through the same service: `http://localhost:8080/v1/health`
+
+## Demo-Only Cloud Run Deployment
+
+The root `Dockerfile` is safe to deploy as a self-contained client demo with no
+environment variables. When no overrides are supplied, the runtime defaults are:
+
+- `ENVIRONMENT=demo`
+- `AUTH_MODE=demo`
+- `PERSISTENCE_BACKEND=sqlite`
+- `DATABASE_URL=sqlite:////tmp/itr_demo.db`
+- `STORAGE_BACKEND=local`
+- `FILING_PROVIDER=mock`
+- `FILING_PROVIDER_MODE=mock`
+- `ALLOW_LIVE_FILING=false`
+- `ALLOW_SANDBOX_PROVIDER_CALLS=false`
+- `DEBUG=false`
+
+Demo mode does not require Google Cloud Secret Manager, GCS, Cloud SQL,
+JWT/OAuth, ERI credentials, sandbox credentials, or government filing
+credentials. The browser calls same-origin `/v1/*` endpoints when
+`NEXT_PUBLIC_API_BASE_URL` is empty or unset, and the Next.js server proxies
+those requests to the local FastAPI process in the same container.
+
+Demo limitations:
+
+- Data is temporary local demo data, not production durable storage.
+- Demo auth is for client walkthroughs only and is not production auth.
+- Filing provider behavior is mock-only.
+- Live filing, real ERI calls, sandbox provider calls, government filing,
+  e-verification, and acknowledgement retrieval are disabled.
+- Sandbox readiness can be displayed honestly, but real sandbox calls remain
+  blocked unless explicitly approved and configured outside demo mode.
+
+Example demo deploy:
+
+```bash
+docker build -t itr-platform-demo .
+gcloud run deploy itr-platform-demo \
+  --image itr-platform-demo \
+  --allow-unauthenticated
+```
 
 ## Backend-Only Dockerfile
 

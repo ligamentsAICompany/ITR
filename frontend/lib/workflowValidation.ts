@@ -2,6 +2,10 @@ import type { BasicFormState } from "@/types/itr";
 import { validateAadhaar } from "./aadhaar";
 
 export function validateWorkflowInput(form: BasicFormState): string | null {
+  if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(form.pan.trim().toUpperCase())) {
+    return "Please enter a valid PAN (e.g., ABCDE1234F).";
+  }
+
   const aadhaarValidation = validateAadhaar(form.aadhaar);
   if (aadhaarValidation.error) {
     return aadhaarValidation.error;

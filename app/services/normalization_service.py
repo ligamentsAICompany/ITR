@@ -43,7 +43,7 @@ def normalize_raw_user_data(raw_data: dict[str, Any]) -> CanonicalTaxProfile:
         "is_defective_return_case": raw_data.get("is_defective_return_case", "unknown"),
         "user_identity": {
             "pan": str(raw_data.get("pan", "")).strip().upper(),
-            "aadhaar_number": raw_data.get("aadhaar_number"),
+            "aadhaar_number": raw_data.get("aadhaar_number", raw_data.get("aadhaar")),
         },
         "entity_type": raw_data.get("entity_type", "individual"),
         "residency_status": {

@@ -58,6 +58,10 @@ const baseForm: BasicFormState = {
 };
 
 describe("workflow validation", () => {
+  it("blocks invalid PAN before workflow endpoints are called", () => {
+    assert.equal(validateWorkflowInput({ ...baseForm, pan: "ABCDE12345" }), "Please enter a valid PAN (e.g., ABCDE1234F).");
+  });
+
   it("allows valid Aadhaar to continue to workflow endpoints", () => {
     assert.equal(validateWorkflowInput({ ...baseForm, aadhaar: "123456789012" }), null);
   });

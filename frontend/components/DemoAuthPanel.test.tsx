@@ -57,4 +57,32 @@ describe("demo auth panel", () => {
       }
     }
   });
+
+  it("shows demo identity controls for production demo builds by default", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousAuthMode = process.env.NEXT_PUBLIC_AUTH_MODE;
+    const previousDemoFlag = process.env.NEXT_PUBLIC_DEMO_AUTH_ENABLED;
+    process.env.NODE_ENV = "production";
+    delete process.env.NEXT_PUBLIC_AUTH_MODE;
+    delete process.env.NEXT_PUBLIC_DEMO_AUTH_ENABLED;
+
+    try {
+      const markup = renderToStaticMarkup(<DemoAuthPanel />);
+
+      assert.match(markup, /Demo auth context/);
+      assert.match(markup, /Demo user/);
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+      if (previousAuthMode === undefined) {
+        delete process.env.NEXT_PUBLIC_AUTH_MODE;
+      } else {
+        process.env.NEXT_PUBLIC_AUTH_MODE = previousAuthMode;
+      }
+      if (previousDemoFlag === undefined) {
+        delete process.env.NEXT_PUBLIC_DEMO_AUTH_ENABLED;
+      } else {
+        process.env.NEXT_PUBLIC_DEMO_AUTH_ENABLED = previousDemoFlag;
+      }
+    }
+  });
 });

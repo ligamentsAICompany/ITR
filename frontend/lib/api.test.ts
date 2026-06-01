@@ -70,6 +70,18 @@ describe("normalizeProfile Aadhaar payload", () => {
     delete (globalThis as { fetch?: typeof fetch }).fetch;
   });
 
+  it("uses same-origin v1 endpoints when no public API base URL is configured", async () => {
+    let capturedUrl = "";
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      capturedUrl = String(input);
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }) as typeof fetch;
+
+    await normalizeProfile(baseForm);
+
+    assert.equal(capturedUrl, "/v1/normalize");
+  });
+
   it("sends valid Aadhaar unchanged", async () => {
     const payload = await captureNormalizePayload({ ...baseForm, aadhaar: "123456789012" });
 

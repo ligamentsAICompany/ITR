@@ -85,6 +85,65 @@ def test_normalize_returns_canonical_profile_defaults_for_partial_input():
     assert response.headers["x-trace-id"]
 
 
+def test_normalize_accepts_synthetic_demo_payload_with_aadhaar_alias():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "ABCDE1234F",
+            "aadhaar": "123456789012",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "salary_income": 1000000,
+            "previous_year": "2025-26",
+            "assessment_year": "2026-27",
+            "return_filing_reason": "mandatory",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["user_identity"]["pan"] == "ABCDE1234F"
+    assert payload["user_identity"]["aadhaar_number"] == "123456789012"
+    assert payload["income_heads"]["salary"]["gross_amount"] == 1000000
+    assert payload["return_filing_reason"]["type"] == "mandatory"
+
+
+def test_normalize_rejects_invalid_pan_as_invalid_schema():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "ABCDE12345",
+            "aadhaar": "123456789012",
+            "assessment_year": "2026-27",
+            "previous_year": "2025-26",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "salary_income": 1000000,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "invalid_schema"
+
+
+def test_normalize_rejects_invalid_aadhaar_alias_as_invalid_schema():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "ABCDE1234F",
+            "aadhaar": "12345",
+            "assessment_year": "2026-27",
+            "previous_year": "2025-26",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "salary_income": 1000000,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "invalid_schema"
+
+
 def test_normalize_preserves_house_property_details_from_ui_payload():
     response = client.post(
         "/v1/normalize",

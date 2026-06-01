@@ -64,7 +64,7 @@ class Settings:
     def __init__(self) -> None:
         self.api_base_url = getenv("API_BASE_URL", "http://127.0.0.1:8000")
         self.debug = getenv("DEBUG", "false").lower() in {"1", "true", "yes", "on"}
-        self.environment = getenv("ENVIRONMENT", "development").lower()
+        self.environment = getenv("ENVIRONMENT", "demo").lower()
         self.auth_mode = getenv("AUTH_MODE", "demo").lower()
         self.allow_demo_auth_in_production = getenv("ALLOW_DEMO_AUTH_IN_PRODUCTION", "false").lower() in {
             "1",
@@ -76,10 +76,15 @@ class Settings:
         self.max_request_bytes = int(getenv("MAX_REQUEST_BYTES", "1048576"))
         self.document_storage_dir = getenv("DOCUMENT_STORAGE_DIR", ".local_uploads")
         self.max_upload_bytes = int(getenv("MAX_UPLOAD_BYTES", "10485760"))
-        self.database_url = getenv("DATABASE_URL") or None
         self.persistence_backend = getenv("PERSISTENCE_BACKEND", "sqlite").lower()
+        self.database_url = _default_database_url(self.persistence_backend)
         self.persistence_storage_dir = getenv("PERSISTENCE_STORAGE_DIR", ".local_persistence")
-        self.demo_auth_enabled = getenv("DEMO_AUTH_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+        self.demo_auth_enabled = getenv("DEMO_AUTH_ENABLED", "true" if self.environment == "demo" else "false").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         self.storage_backend = getenv("STORAGE_BACKEND", "local").lower()
         self.gcs_bucket_name = getenv("GCS_BUCKET_NAME") or None
         self.jwt_issuer = getenv("JWT_ISSUER") or None
@@ -150,8 +155,8 @@ class Settings:
 
     def validate_startup(self) -> None:
         errors: list[str] = []
-        if self.environment not in {"development", "test", "production"}:
-            errors.append("ENVIRONMENT must be development, test, or production")
+        if self.environment not in {"demo", "development", "test", "production"}:
+            errors.append("ENVIRONMENT must be demo, development, test, or production")
         if self.auth_mode not in {"demo", "jwt", "google"}:
             errors.append("AUTH_MODE must be demo, jwt, or google")
         if self.persistence_backend not in {"memory", "sqlite", "postgres"}:
@@ -218,6 +223,15 @@ def get_settings() -> Settings:
 
 def _csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _default_database_url(persistence_backend: str) -> str | None:
+    configured = getenv("DATABASE_URL")
+    if configured:
+        return configured
+    if persistence_backend == "sqlite":
+        return "sqlite:////tmp/itr_demo.db"
+    return None
 
 
 def _is_localhost_url(value: str) -> bool:
