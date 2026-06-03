@@ -27,6 +27,8 @@ DEMO_ENV_VARS = (
     "JWT_SECRET",
     "JWT_JWKS_URL",
     "GOOGLE_OAUTH_CLIENT_ID",
+    "AUTO_LOAD_DEMO_SCHEMA_PACKS",
+    "DOCUMENT_STORAGE_DIR",
 )
 
 
@@ -48,11 +50,13 @@ def test_default_config_boots_safe_demo_mode_without_env(monkeypatch):
     assert settings.persistence_backend == "sqlite"
     assert settings.database_url == "sqlite:////tmp/itr_demo.db"
     assert settings.storage_backend == "local"
+    assert settings.document_storage_dir == "/tmp/itr_demo_uploads"
     assert settings.filing_provider == "mock"
     assert settings.filing_provider_mode == "mock"
     assert settings.allow_live_filing is False
     assert settings.allow_sandbox_provider_calls is False
     assert settings.debug is False
+    assert settings.auto_load_demo_schema_packs is True
 
 
 def test_production_blocks_unsafe_demo_auth_unless_explicitly_allowed(monkeypatch):
@@ -124,13 +128,45 @@ def test_demo_health_exposes_safe_default_fields_without_secret_env(monkeypatch)
         "status": "ok",
         "api_version": "v1",
         "environment": "demo",
+        "auth_mode": "demo",
         "persistence_backend": "sqlite",
         "storage_backend": "local",
-        "auth_mode": "demo",
+        "provider_mode": "mock",
+        "live_filing_enabled": False,
     }
     assert "GCP_PROJECT_ID" not in response.text
     assert "GCS_BUCKET_NAME" not in response.text
     assert "JWT_SECRET" not in response.text
+    assert "DOCUMENT_STORAGE_DIR" not in response.text
+    assert "/tmp" not in response.text
+
+
+def test_production_defaults_do_not_auto_load_demo_schema_packs(monkeypatch):
+    clear_demo_env(monkeypatch)
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("AUTH_MODE", "jwt")
+    monkeypatch.setenv("JWT_ISSUER", "https://issuer.example.com")
+    monkeypatch.setenv("JWT_AUDIENCE", "itr-api")
+    monkeypatch.setenv("JWT_SECRET", "test-secret")
+    monkeypatch.setenv("API_BASE_URL", "https://api.example.com")
+    monkeypatch.setenv("NEXT_PUBLIC_API_BASE_URL", "https://app.example.com")
+
+    settings = Settings()
+
+    assert settings.auto_load_demo_schema_packs is False
+
+
+def test_demo_health_and_diagnostics_routes_return_200_before_manual_setup(monkeypatch):
+    clear_demo_env(monkeypatch)
+    client = TestClient(app)
+
+    health = client.get("/v1/health")
+    diagnostics = client.get("/v1/filing/provider-diagnostics")
+
+    assert health.status_code == 200, health.text
+    assert diagnostics.status_code == 200, diagnostics.text
+    assert diagnostics.json()["mode"] == "mock"
+    assert diagnostics.json()["live_filing_enabled"] is False
 
 
 def test_normalize_valid_synthetic_payload_works_under_demo_defaults(monkeypatch):

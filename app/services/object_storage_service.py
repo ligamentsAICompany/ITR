@@ -12,6 +12,8 @@ from app.core.config import get_settings
 
 PAN_RE = re.compile(r"\b[A-Z]{5}[0-9]{4}[A-Z]\b")
 AADHAAR_RE = re.compile(r"\b[0-9]{12}\b")
+PAN_TOKEN_RE = re.compile(r"[A-Z]{5}[0-9]{4}[A-Z]")
+AADHAAR_TOKEN_RE = re.compile(r"[0-9]{12}")
 
 
 class ObjectStorageService:
@@ -124,7 +126,7 @@ def safe_storage_filename(filename: str) -> str:
     suffix = Path(name).suffix.lower()
     safe_stem = re.sub(r"[^A-Za-z0-9._-]+", "_", stem).strip("._-")
     candidate = f"{safe_stem or 'document'}{suffix}"
-    if PAN_RE.search(candidate) or AADHAAR_RE.search(candidate):
+    if _contains_sensitive_identifier(candidate):
         return f"document{suffix}"
     return candidate
 
@@ -132,7 +134,7 @@ def safe_storage_filename(filename: str) -> str:
 def _validate_object_key(key: str) -> str:
     if key.startswith("/") or ".." in key.split("/"):
         raise ValueError("Unsafe object key")
-    if PAN_RE.search(key) or AADHAAR_RE.search(key):
+    if _contains_sensitive_identifier(key):
         raise ValueError("Object key cannot contain PAN or Aadhaar")
     return key
 
@@ -148,3 +150,12 @@ def _safe_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
         for key, value in metadata.items()
         if key not in {"storage_path", "raw_text", "raw_document_text", "object_key"}
     }
+
+
+def _contains_sensitive_identifier(value: str) -> bool:
+    return bool(
+        PAN_RE.search(value)
+        or AADHAAR_RE.search(value)
+        or PAN_TOKEN_RE.search(value.upper())
+        or AADHAAR_TOKEN_RE.search(value)
+    )

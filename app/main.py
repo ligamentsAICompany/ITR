@@ -1,11 +1,15 @@
 """FastAPI entrypoint for the deterministic ITR classification backend."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
 from app.api.routes import router
+from app.core.demo_bootstrap import bootstrap_demo_runtime
 from app.core.config import get_settings
 from app.core.errors import (
     InvalidSchemaError,
@@ -17,18 +21,23 @@ from app.core.errors import (
 from app.core.logging import configure_logging, request_response_logging_middleware
 from app.core.rate_limit import rate_limit_middleware
 from app.core.request_validation import request_validation_middleware
-from app.tools.load_demo_schema_packs import load_demo_schema_packs
 
 configure_logging()
 settings = get_settings()
 settings.validate_startup()
-if settings.auto_load_demo_schema_packs and settings.environment == "demo":
-    load_demo_schema_packs()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    bootstrap_demo_runtime()
+    yield
+
 
 app = FastAPI(
     title="Deterministic ITR Classification API",
     version="0.1.0",
     debug=settings.debug,
+    lifespan=lifespan,
 )
 
 app.middleware("http")(rate_limit_middleware)
@@ -49,22 +58,36 @@ app.include_router(router, prefix="/v1")
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
+def health() -> dict[str, str | bool]:
     return _health_payload(api_version="v1")
 
 
 @app.get("/v1/health")
-def versioned_health() -> dict[str, str]:
+def versioned_health() -> dict[str, str | bool]:
     return _health_payload(api_version="v1")
 
 
-def _health_payload(*, api_version: str) -> dict[str, str]:
-    current = get_settings()
+def _health_payload(*, api_version: str) -> dict[str, str | bool]:
+    try:
+        current = get_settings()
+    except Exception:
+        return {
+            "status": "degraded",
+            "api_version": api_version,
+            "environment": "unknown",
+            "auth_mode": "unknown",
+            "persistence_backend": "unknown",
+            "storage_backend": "unknown",
+            "provider_mode": "unknown",
+            "live_filing_enabled": False,
+        }
     return {
         "status": "ok",
         "api_version": api_version,
         "environment": current.environment,
+        "auth_mode": current.auth_mode,
         "persistence_backend": current.persistence_backend,
         "storage_backend": current.storage_backend,
-        "auth_mode": current.auth_mode,
+        "provider_mode": current.filing_provider_mode,
+        "live_filing_enabled": current.allow_live_filing,
     }

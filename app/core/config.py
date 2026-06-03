@@ -75,7 +75,10 @@ class Settings:
         }
         self.rate_limit_per_minute = int(getenv("RATE_LIMIT_PER_MINUTE", "120"))
         self.max_request_bytes = int(getenv("MAX_REQUEST_BYTES", "1048576"))
-        self.document_storage_dir = getenv("DOCUMENT_STORAGE_DIR", ".local_uploads")
+        self.document_storage_dir = getenv(
+            "DOCUMENT_STORAGE_DIR",
+            "/tmp/itr_demo_uploads" if self.environment == "demo" else ".local_uploads",
+        )
         self.max_upload_bytes = int(getenv("MAX_UPLOAD_BYTES", "10485760"))
         self.persistence_backend = getenv("PERSISTENCE_BACKEND", "sqlite").lower()
         self.database_url = _default_database_url(self.persistence_backend)
@@ -145,7 +148,8 @@ class Settings:
         }
         self.provider_raw_payload_retention_days = int(getenv("PROVIDER_RAW_PAYLOAD_RETENTION_DAYS", "30"))
         self.mock_filing_outcome = getenv("MOCK_FILING_OUTCOME", "success").lower()
-        self.auto_load_demo_schema_packs = getenv("AUTO_LOAD_DEMO_SCHEMA_PACKS", "false").lower() in {
+        auto_load_default = "true" if self.environment == "demo" else "false"
+        self.auto_load_demo_schema_packs = getenv("AUTO_LOAD_DEMO_SCHEMA_PACKS", auto_load_default).lower() in {
             "1",
             "true",
             "yes",

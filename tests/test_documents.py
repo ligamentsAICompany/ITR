@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.core.config import Settings, get_settings
 from app.models.document import DocumentType, ExtractedField, ExtractionResult
 from app.services.document_extraction_service import DocumentExtractionService
 from app.services.document_validation_service import DocumentValidationService
@@ -31,6 +32,33 @@ def test_storage_sanitizes_filename_hashes_content_and_writes_metadata(tmp_path:
     assert record.storage_path.endswith("Form_16_FY25.csv")
     assert Path(record.storage_path).read_bytes() == b"Gross Salary,1200000\n"
     assert storage.get(record.document_id).sha256 == record.sha256
+
+
+def test_demo_default_upload_root_is_writable_tmp(monkeypatch):
+    monkeypatch.delenv("DOCUMENT_STORAGE_DIR", raising=False)
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    get_settings.cache_clear()
+
+    settings = Settings()
+
+    assert settings.document_storage_dir == "/tmp/itr_demo_uploads"
+
+
+def test_local_storage_auto_creates_missing_root_and_sanitizes_traversal(tmp_path: Path):
+    missing_root = tmp_path / "missing" / "uploads"
+    storage = LocalStorageService(missing_root)
+
+    record = storage.save(
+        content=b"Gross Salary,1200000\n",
+        original_filename="../../PAN ABCDE1234F.csv",
+        content_type="text/csv",
+        document_type=DocumentType.FORM16,
+    )
+
+    assert missing_root.exists()
+    assert record.safe_filename == "document.csv"
+    assert Path(record.storage_path).is_relative_to(missing_root.resolve())
+    assert Path(record.storage_path).read_bytes() == b"Gross Salary,1200000\n"
 
 
 def test_storage_rejects_non_uuid_document_ids(tmp_path: Path):
@@ -171,6 +199,7 @@ def test_upload_endpoint_accepts_multipart_and_extracts_csv(tmp_path: Path, monk
     upload_payload = upload_response.json()
     assert upload_payload["original_filename"] == "form16.csv"
     assert upload_payload["sha256"]
+    assert "storage_path" not in upload_payload
 
     extract_response = client.post(f"/v1/uploads/{upload_payload['document_id']}/extract")
 

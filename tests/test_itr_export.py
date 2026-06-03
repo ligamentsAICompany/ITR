@@ -5,10 +5,13 @@ from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
 
 from app.main import app
+from app.core.demo_bootstrap import bootstrap_demo_runtime
+from app.core.config import get_settings
 from app.models.decision import ITRDecisionResponse
 from app.models.tax_computation import (
     DeductionBreakdown,
@@ -43,7 +46,18 @@ def auth(user_id=USER_A, role="taxpayer", org_id=ORG_A):
     }
 
 
-def setup_function():
+@pytest.fixture(autouse=True)
+def isolate_itr_export_runtime(monkeypatch):
+    monkeypatch.setenv("PERSISTENCE_BACKEND", "memory")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    get_settings.cache_clear()
+    SCHEMA_PACK_CACHE.clear()
+    SCHEMA_PACK_CONTENT_CACHE.clear()
+    ITR_EXPORT_CACHE.clear()
+    ITR_EXPORT_ARTIFACT_CACHE.clear()
+    AUDIT_EVENT_CACHE.clear()
+    yield
+    get_settings.cache_clear()
     SCHEMA_PACK_CACHE.clear()
     SCHEMA_PACK_CONTENT_CACHE.clear()
     ITR_EXPORT_CACHE.clear()
@@ -428,6 +442,68 @@ def test_demo_schema_loader_registers_activates_and_is_idempotent():
             if pack.assessment_year == "2026-27" and pack.itr_form == itr_form and pack.is_active
         ]
         assert len(active_for_pair) == 1
+
+
+def test_demo_bootstrap_autoloads_schema_packs_and_itr3_export_is_ready(monkeypatch, tmp_path):
+    monkeypatch.setenv("ENVIRONMENT", "demo")
+    monkeypatch.setenv("AUTO_LOAD_DEMO_SCHEMA_PACKS", "true")
+    monkeypatch.setenv("DOCUMENT_STORAGE_DIR", str(tmp_path / "uploads"))
+    get_settings.cache_clear()
+
+    summary = bootstrap_demo_runtime()
+    service = SchemaPackService()
+
+    assert summary["schema_packs_loaded"] == 4
+    assert (tmp_path / "uploads").exists()
+    for itr_form in ["ITR-1", "ITR-2", "ITR-3", "ITR-4"]:
+        active = service.active_for(assessment_year="2026-27", itr_form=itr_form)
+        assert active is not None
+        assert active[0].is_active is True
+
+    itr3_profile = profile(
+        income_heads={
+            "business_profession": {"has_income": "yes", "gross_amount": 950000, "presumptive_taxation": "no"},
+            "capital_gains": {"has_income": "yes", "gross_amount": 250000},
+        },
+        foreign_assets={"has_foreign_assets": "yes", "has_foreign_income": "yes"},
+    )
+    response = client.post(
+        "/v1/itr-exports/generate",
+        json=export_payload(candidate=decision("ITR-3")) | {"profile": itr3_profile},
+        headers=auth(USER_A),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "ready_for_download"
+    assert "official government schema" not in response.text.lower()
+
+
+def test_demo_bootstrap_is_idempotent(monkeypatch, tmp_path):
+    monkeypatch.setenv("ENVIRONMENT", "demo")
+    monkeypatch.setenv("AUTO_LOAD_DEMO_SCHEMA_PACKS", "true")
+    monkeypatch.setenv("DOCUMENT_STORAGE_DIR", str(tmp_path / "uploads"))
+    get_settings.cache_clear()
+
+    first = bootstrap_demo_runtime()
+    first_ids = sorted(pack.schema_pack_id for pack in SchemaPackService().list())
+    second = bootstrap_demo_runtime()
+    second_ids = sorted(pack.schema_pack_id for pack in SchemaPackService().list())
+
+    assert first["schema_packs_loaded"] == 4
+    assert second["schema_packs_loaded"] == 4
+    assert first_ids == second_ids
+
+
+def test_demo_bootstrap_does_not_autoload_in_production(monkeypatch, tmp_path):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("AUTO_LOAD_DEMO_SCHEMA_PACKS", "true")
+    monkeypatch.setenv("DOCUMENT_STORAGE_DIR", str(tmp_path / "uploads"))
+    get_settings.cache_clear()
+
+    summary = bootstrap_demo_runtime()
+
+    assert summary["schema_packs_loaded"] == 0
+    assert SchemaPackService().list() == []
 
 
 def test_demo_schema_exports_validate_for_itr1_itr2_itr3_and_itr4():
