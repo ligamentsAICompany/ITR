@@ -57,11 +57,12 @@ COPY --from=frontend-builder /frontend/public ./frontend/public
 COPY --from=frontend-builder /frontend/.next/standalone ./frontend
 COPY --from=frontend-builder /frontend/.next/static ./frontend/.next/static
 
-RUN chmod +x ./scripts/start-fullstack.sh
+RUN sed -i 's/\r$//' ./scripts/start-fullstack.sh \
+    && chmod +x ./scripts/start-fullstack.sh
 
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -fsS http://127.0.0.1:${PORT:-8080}/v1/health || exit 1
 
-CMD ["./scripts/start-fullstack.sh"]
+CMD ["sh", "./scripts/start-fullstack.sh"]

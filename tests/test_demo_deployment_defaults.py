@@ -227,3 +227,5 @@ def test_cloud_run_image_includes_demo_schema_packs():
     content = dockerfile.read_text(encoding="utf-8")
 
     assert "COPY demo_data ./demo_data" in content
+    assert "sed -i 's/\\r$//'" in content
+    assert 'CMD ["sh", "./scripts/start-fullstack.sh"]' in content
