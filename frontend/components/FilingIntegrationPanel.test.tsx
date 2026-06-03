@@ -99,6 +99,12 @@ const readyExport: ItrExport = {
   updated_at: "2026-05-30T00:00:00Z",
 };
 
+function buttonTag(html: string, label: string): string {
+  const match = html.match(new RegExp(`<button[^>]*>${label}</button>`));
+  assert.ok(match, `Expected ${label} button`);
+  return match[0];
+}
+
 describe("filing integration UI", () => {
   it("renders readiness blockers, actions, mode badge, disclaimers, and disabled submit", () => {
     const html = renderToStaticMarkup(
@@ -218,6 +224,51 @@ describe("filing integration UI", () => {
     assert.doesNotMatch(html, /Approval cannot be requested/i);
     assert.match(html, /<button[^>]*>Request approval<\/button>/);
     assert.match(html, /Request approval/);
+  });
+
+  it("enables submit only when a draft has ready filing readiness", () => {
+    const notReadyHtml = renderToStaticMarkup(
+      <FilingSubmissionPanel
+        submission={submission}
+        readiness={readiness}
+        error={null}
+        loading={false}
+        onCreate={() => undefined}
+        onSubmit={() => undefined}
+        onStatusCheck={() => undefined}
+      />,
+    );
+    const readyHtml = renderToStaticMarkup(
+      <FilingSubmissionPanel
+        submission={submission}
+        readiness={{ ...readiness, ready: true, blockers: [], required_actions: [] }}
+        error={null}
+        loading={false}
+        onCreate={() => undefined}
+        onSubmit={() => undefined}
+        onStatusCheck={() => undefined}
+      />,
+    );
+
+    assert.match(buttonTag(notReadyHtml, "Submit through provider"), /\sdisabled=""/);
+    assert.doesNotMatch(buttonTag(readyHtml, "Submit through provider"), /\sdisabled=""/);
+  });
+
+  it("enables e-verification only after provider reference exists", () => {
+    const draftHtml = renderToStaticMarkup(
+      <EVerificationPanel submission={submission} loading={false} onInitiate={() => undefined} onRefresh={() => undefined} />,
+    );
+    const submittedHtml = renderToStaticMarkup(
+      <EVerificationPanel
+        submission={{ ...submission, submission_status: "submitted", provider_reference_id: "MOCK-pkg-export" }}
+        loading={false}
+        onInitiate={() => undefined}
+        onRefresh={() => undefined}
+      />,
+    );
+
+    assert.match(buttonTag(draftHtml, "Initiate e-verification"), /\sdisabled=""/);
+    assert.doesNotMatch(buttonTag(submittedHtml, "Initiate e-verification"), /\sdisabled=""/);
   });
 
   it("renders provider diagnostics, live warning, missing config, retryable error, and capabilities", () => {

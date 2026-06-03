@@ -1,6 +1,6 @@
 """Repositories for filing consent, approval, submission, and acknowledgements."""
 
-from app.core.database import get_json_record, save_json_record
+from app.core.database import get_json_record, list_json_records, save_json_record
 from app.models.filing_approval import FilingApproval
 from app.models.filing_consent import FilingConsent
 from app.models.filing_submission import Acknowledgement, FilingSubmission
@@ -31,18 +31,24 @@ class FilingConsentRepository:
         return consent
 
     def active_for(self, *, package_id: str, export_id: str, user_id: str, organization_id: str) -> FilingConsent | None:
-        return next(
-            (
-                consent
-                for consent in FILING_CONSENT_CACHE.values()
-                if consent.package_id == package_id
+        def matches(consent: FilingConsent) -> bool:
+            return (
+                consent.package_id == package_id
                 and consent.export_id == export_id
                 and consent.user_id == user_id
                 and consent.organization_id == organization_id
                 and consent.is_active
-            ),
-            None,
-        )
+            )
+
+        cached = next((consent for consent in FILING_CONSENT_CACHE.values() if matches(consent)), None)
+        if cached is not None:
+            return cached
+        for payload in list_json_records(self.table):
+            consent = FilingConsent.model_validate(payload)
+            FILING_CONSENT_CACHE[consent.consent_id] = consent
+            if matches(consent):
+                return consent
+        return None
 
 
 class FilingApprovalRepository:
@@ -65,30 +71,42 @@ class FilingApprovalRepository:
         return approval
 
     def approved_for(self, *, package_id: str, export_id: str, organization_id: str) -> FilingApproval | None:
-        return next(
-            (
-                approval
-                for approval in FILING_APPROVAL_CACHE.values()
-                if approval.package_id == package_id
+        def matches(approval: FilingApproval) -> bool:
+            return (
+                approval.package_id == package_id
                 and approval.export_id == export_id
                 and approval.organization_id == organization_id
                 and approval.approval_status == "approved"
-            ),
-            None,
-        )
+            )
+
+        cached = next((approval for approval in FILING_APPROVAL_CACHE.values() if matches(approval)), None)
+        if cached is not None:
+            return cached
+        for payload in list_json_records(self.table):
+            approval = FilingApproval.model_validate(payload)
+            FILING_APPROVAL_CACHE[approval.approval_id] = approval
+            if matches(approval):
+                return approval
+        return None
 
     def pending_for(self, *, package_id: str, export_id: str, organization_id: str) -> FilingApproval | None:
-        return next(
-            (
-                approval
-                for approval in FILING_APPROVAL_CACHE.values()
-                if approval.package_id == package_id
+        def matches(approval: FilingApproval) -> bool:
+            return (
+                approval.package_id == package_id
                 and approval.export_id == export_id
                 and approval.organization_id == organization_id
                 and approval.approval_status == "pending"
-            ),
-            None,
-        )
+            )
+
+        cached = next((approval for approval in FILING_APPROVAL_CACHE.values() if matches(approval)), None)
+        if cached is not None:
+            return cached
+        for payload in list_json_records(self.table):
+            approval = FilingApproval.model_validate(payload)
+            FILING_APPROVAL_CACHE[approval.approval_id] = approval
+            if matches(approval):
+                return approval
+        return None
 
 
 class FilingSubmissionRepository:

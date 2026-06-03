@@ -243,6 +243,27 @@ def test_mock_submission_status_everification_and_acknowledgement_lifecycle():
     assert ack.json()["acknowledgement_number"].startswith("MOCK-ACK-")
 
 
+def test_readiness_and_submit_use_persisted_consent_and_approval_after_cache_miss(monkeypatch, tmp_path):
+    monkeypatch.setenv("PERSISTENCE_BACKEND", "sqlite")
+    monkeypatch.setenv("PERSISTENCE_STORAGE_DIR", str(tmp_path))
+    get_settings.cache_clear()
+    package, export, submission = create_submission()
+    grant_consent(package, export)
+    approve(package, export)
+
+    FILING_CONSENT_CACHE.clear()
+    FILING_APPROVAL_CACHE.clear()
+
+    readiness = client.post(f"/v1/filing/submissions/{submission['submission_id']}/readiness", json={}, headers=auth())
+    submitted = client.post(f"/v1/filing/submissions/{submission['submission_id']}/submit", json={}, headers=auth())
+
+    assert readiness.status_code == 200
+    assert readiness.json()["ready"] is True
+    assert readiness.json()["blockers"] == []
+    assert submitted.status_code == 200, submitted.text
+    assert submitted.json()["provider_reference_id"].startswith("MOCK-")
+
+
 def test_mock_submission_failure_and_live_or_missing_provider_fail_safely(monkeypatch):
     package, export, submission = create_submission()
     grant_consent(package, export)
