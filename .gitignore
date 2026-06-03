@@ -8,6 +8,7 @@ __pycache__/
 .ruff_cache/
 .local_uploads/
 .local_persistence/
+.local_demo_artifacts/
 .playwright-mcp/
 
 frontend/node_modules/

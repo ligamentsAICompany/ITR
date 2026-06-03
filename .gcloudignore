@@ -1,3 +1,7 @@
+.git
+.env
+.env.*
+.local_demo_artifacts
 .pytest_cache
 .ruff_cache
 __pycache__
@@ -5,6 +9,4 @@ __pycache__
 node_modules
 frontend/node_modules
 frontend/.next
-.local_demo_artifacts
-.git
-.env
+frontend/.test-build
