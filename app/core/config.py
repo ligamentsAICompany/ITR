@@ -60,6 +60,7 @@ class Settings:
     store_provider_raw_payloads: bool
     provider_raw_payload_retention_days: int
     mock_filing_outcome: str
+    auto_load_demo_schema_packs: bool
 
     def __init__(self) -> None:
         self.api_base_url = getenv("API_BASE_URL", "http://127.0.0.1:8000")
@@ -144,6 +145,12 @@ class Settings:
         }
         self.provider_raw_payload_retention_days = int(getenv("PROVIDER_RAW_PAYLOAD_RETENTION_DAYS", "30"))
         self.mock_filing_outcome = getenv("MOCK_FILING_OUTCOME", "success").lower()
+        self.auto_load_demo_schema_packs = getenv("AUTO_LOAD_DEMO_SCHEMA_PACKS", "false").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
     @property
     def is_production(self) -> bool:

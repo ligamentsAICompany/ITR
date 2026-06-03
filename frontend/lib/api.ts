@@ -28,6 +28,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 type ApiErrorBody = {
   error?: string;
   message?: string;
+  detail?: unknown;
   details?: unknown;
 };
 
@@ -161,9 +162,18 @@ export function applyMergedPayloadToForm(
 
 function toFriendlyErrorMessage(path: string, status: number, rawBody: string): string {
   const body = parseErrorBody(rawBody);
-  const detailText = JSON.stringify(body?.details ?? "").toLowerCase();
+  const detailText = JSON.stringify(body?.detail ?? body?.details ?? "").toLowerCase();
   const messageText = `${body?.message ?? ""} ${body?.error ?? ""} ${detailText}`.toLowerCase();
 
+  if (messageText.includes("schema export is not ready") || messageText.includes("failed validation blocks approval")) {
+    return "Approval cannot be requested yet because schema export is not ready. Please generate a schema-validated export first.";
+  }
+  if (messageText.includes("filing submission is blocked") || messageText.includes("submission is not ready yet")) {
+    return "Submission is not ready yet. Complete consent, reviewer approval, and export validation first.";
+  }
+  if (messageText.includes("schema_pack_not_configured") || messageText.includes("no active schema pack")) {
+    return "Export validation is not configured for this ITR form and assessment year. Load or activate a demo schema pack before requesting approval or mock filing.";
+  }
   if (messageText.includes("pan")) {
     return "Please enter a valid PAN (e.g., ABCDE1234F).";
   }

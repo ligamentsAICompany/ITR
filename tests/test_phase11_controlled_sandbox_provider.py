@@ -409,8 +409,9 @@ def test_controlled_sandbox_submission_endpoint_is_blocked_when_calls_disabled(m
     ITR_EXPORT_CACHE[export.export_id] = export
 
     draft = client.post("/v1/filing/submissions", headers=auth(), json={"package_id": package.package_id, "export_id": export.export_id})
+    readiness = client.post(f"/v1/filing/submissions/{draft.json()['submission_id']}/readiness", headers=auth(), json={})
     response = client.post(f"/v1/filing/submissions/{draft.json()['submission_id']}/submit", headers=auth(), json={})
 
+    assert "sandbox_provider_calls_disabled" in readiness.text
     assert response.status_code == 400
-    assert "blocked" in response.text.lower()
-    assert "sandbox_provider_calls_disabled" in response.text
+    assert response.json()["detail"] == "Submission is not ready yet. Complete consent, reviewer approval, and export validation first."

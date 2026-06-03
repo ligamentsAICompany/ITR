@@ -464,6 +464,10 @@ export default function Home() {
       setFilingWorkflowError("Generate a filing package and official export before creating a filing submission.");
       return;
     }
+    if (!isExportReadyForFiling(itrExport)) {
+      setFilingWorkflowError("Generate a schema-validated export before creating a filing submission.");
+      return;
+    }
     setLoading(true);
     setFilingWorkflowError(null);
     try {
@@ -552,6 +556,10 @@ export default function Home() {
       setFilingWorkflowError("Generate a filing package and official export before requesting approval.");
       return;
     }
+    if (!isExportReadyForFiling(itrExport)) {
+      setFilingWorkflowError("Approval cannot be requested yet because schema export is not ready. Please generate a schema-validated export first.");
+      return;
+    }
     setLoading(true);
     setFilingWorkflowError(null);
     try {
@@ -595,6 +603,10 @@ export default function Home() {
 
   async function handleSubmitFiling() {
     if (!filingSubmission) {
+      return;
+    }
+    if (!filingReadiness?.ready) {
+      setFilingWorkflowError("Submission is not ready yet. Complete consent, reviewer approval, and export validation first.");
       return;
     }
     setLoading(true);
@@ -712,6 +724,13 @@ export default function Home() {
 
   const currentDemoRole = demoAuthContext.role;
   const canApproveFiling = currentDemoRole === "reviewer" || currentDemoRole === "admin";
+  const exportReadyForFiling = isExportReadyForFiling(itrExport);
+  const approvalGuardMessage = exportReadyForFiling
+    ? null
+    : "Approval cannot be requested yet because schema export is not ready. Please generate a schema-validated export first.";
+  const submissionCreateGuardMessage = exportReadyForFiling
+    ? null
+    : "Generate a schema-validated export before creating a filing submission.";
 
   return (
     <main className="min-h-screen bg-[#f9fafb]">
@@ -829,6 +848,8 @@ export default function Home() {
           <FilingApprovalPanel
             approval={filingApproval}
             canApprove={canApproveFiling}
+            canRequest={Boolean(filingPackage && exportReadyForFiling)}
+            guardMessage={approvalGuardMessage}
             error={filingWorkflowError}
             loading={loading}
             onRequest={() => void handleRequestApproval()}
@@ -840,6 +861,8 @@ export default function Home() {
             readiness={filingReadiness}
             error={filingWorkflowError}
             loading={loading}
+            canCreate={Boolean(filingPackage && exportReadyForFiling)}
+            createGuardMessage={submissionCreateGuardMessage}
             onCreate={() => void handleCreateFilingSubmission()}
             onSubmit={() => void handleSubmitFiling()}
             onStatusCheck={() => void handleRefreshFilingStatus()}
@@ -915,6 +938,10 @@ function isUnresolved(value: string): boolean {
   return ["unknown", "not sure", "not_sure", "unsure", "i don't know", "dont know", "don't know"].some(
     (phrase) => lowered.includes(phrase),
   );
+}
+
+function isExportReadyForFiling(itrExport: ItrExport | null): boolean {
+  return itrExport?.status === "ready_for_download" && itrExport.validation_result.status === "passed";
 }
 
 function getProgressState({

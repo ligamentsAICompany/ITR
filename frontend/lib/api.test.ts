@@ -8,7 +8,9 @@ import {
   generateFilingPackage,
   mergeExtractionFields,
   normalizeProfile,
+  requestFilingApproval,
   runValidation,
+  submitFilingSubmission,
   uploadDocument,
 } from "./api";
 import type { BasicFormState, ExtractionResult, TaxComputationResult, ValidationReport } from "../types/itr";
@@ -319,6 +321,47 @@ describe("filing package API helpers", () => {
     globalThis.fetch = (async () => new Response(JSON.stringify({ detail: "Authentication required" }), { status: 401 })) as typeof fetch;
 
     await assert.rejects(() => downloadFilingPackageArtifact("pkg-1", "art-1"), /Please sign in/);
+  });
+});
+
+describe("filing gate API errors", () => {
+  afterEach(() => {
+    delete (globalThis as { fetch?: typeof fetch }).fetch;
+  });
+
+  it("maps approval and submission gate errors without exposing raw API paths", async () => {
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("/approvals/request")) {
+        return new Response(
+          JSON.stringify({
+            detail:
+              "Approval cannot be requested yet because schema export is not ready. Please generate a schema-validated export first.",
+          }),
+          { status: 400 },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          detail: "Submission is not ready yet. Complete consent, reviewer approval, and export validation first.",
+        }),
+        { status: 400 },
+      );
+    }) as typeof fetch;
+
+    await assert.rejects(
+      () => requestFilingApproval("pkg-1", "exp-1"),
+      /Approval cannot be requested yet because schema export is not ready/,
+    );
+    await assert.rejects(
+      () => submitFilingSubmission("submission-1"),
+      /Submission is not ready yet\. Complete consent, reviewer approval, and export validation first\./,
+    );
+    await assert.rejects(() => requestFilingApproval("pkg-1", "exp-1"), (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.doesNotMatch(error.message, /\/v1\/filing/);
+      return true;
+    });
   });
 });
 

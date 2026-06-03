@@ -3,8 +3,10 @@ import zipfile
 from copy import deepcopy
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
 
 from fastapi.testclient import TestClient
+from jsonschema import Draft202012Validator
 
 from app.main import app
 from app.models.decision import ITRDecisionResponse
@@ -19,6 +21,8 @@ from app.repositories.audit_repository import AUDIT_EVENT_CACHE
 from app.repositories.itr_export_repository import ITR_EXPORT_ARTIFACT_CACHE, ITR_EXPORT_CACHE
 from app.repositories.schema_pack_repository import SCHEMA_PACK_CACHE, SCHEMA_PACK_CONTENT_CACHE
 from app.services.itr_export_service import ItrExportService
+from app.services.schema_pack_service import SchemaPackService
+from app.tools.load_demo_schema_packs import DEMO_SCHEMA_PACKS, load_demo_schema_packs
 
 
 client = TestClient(app)
@@ -386,3 +390,84 @@ def test_service_does_not_mutate_inputs():
     )
 
     assert original_profile == copied
+
+
+def test_demo_schema_files_are_valid_synthetic_test_schemas():
+    schema_dir = Path(__file__).resolve().parents[1] / "demo_data" / "schema_packs"
+
+    for spec in DEMO_SCHEMA_PACKS:
+        schema = json.loads((schema_dir / spec.filename).read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(schema)
+        disclaimer = json.dumps(schema.get("x-itr", {})).lower()
+        assert "synthetic test schema pack only" in disclaimer
+        assert "not official government schema" in disclaimer
+        assert schema["x-itr"]["assessment_year"] == "2026-27"
+        assert schema["x-itr"]["itr_form"] == spec.itr_form
+        assert schema["required"]
+        assert schema["properties"]
+
+
+def test_demo_schema_loader_registers_activates_and_is_idempotent():
+    first = load_demo_schema_packs()
+    second = load_demo_schema_packs()
+    service = SchemaPackService()
+
+    assert [item.itr_form for item in first] == ["ITR-1", "ITR-2", "ITR-3", "ITR-4"]
+    assert [item.schema_pack_id for item in first] == [item.schema_pack_id for item in second]
+    for itr_form in ["ITR-1", "ITR-2", "ITR-3", "ITR-4"]:
+        active = service.active_for(assessment_year="2026-27", itr_form=itr_form)
+        assert active is not None
+        schema_pack, schema = active
+        assert schema_pack.is_active is True
+        assert schema_pack.assessment_year == "2026-27"
+        assert schema_pack.itr_form == itr_form
+        assert schema["x-itr"]["schema_kind"] == "synthetic_demo_test"
+        active_for_pair = [
+            pack
+            for pack in service.list()
+            if pack.assessment_year == "2026-27" and pack.itr_form == itr_form and pack.is_active
+        ]
+        assert len(active_for_pair) == 1
+
+
+def test_demo_schema_exports_validate_for_itr1_itr2_itr3_and_itr4():
+    load_demo_schema_packs()
+
+    cases = [
+        ("ITR-1", profile()),
+        (
+            "ITR-2",
+            profile(
+                income_heads={"capital_gains": {"has_income": "yes", "gross_amount": 125000}},
+                special_conditions={"capital_gains_edge_case": "yes"},
+            ),
+        ),
+        (
+            "ITR-3",
+            profile(
+                income_heads={
+                    "business_profession": {"has_income": "yes", "gross_amount": 950000, "presumptive_taxation": "no"},
+                    "capital_gains": {"has_income": "yes", "gross_amount": 250000},
+                },
+                foreign_assets={"has_foreign_assets": "yes", "has_foreign_income": "yes"},
+            ),
+        ),
+        (
+            "ITR-4",
+            profile(income_heads={"business_profession": {"has_income": "yes", "gross_amount": 700000, "presumptive_taxation": "yes"}}),
+        ),
+    ]
+
+    for itr_form, sample_profile in cases:
+        response = client.post(
+            "/v1/itr-exports/generate",
+            json=export_payload(candidate=decision(itr_form)) | {"profile": sample_profile},
+            headers=auth(USER_A),
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["candidate_itr"] == itr_form
+        assert payload["status"] == "ready_for_download"
+        assert payload["validation_result"]["status"] == "passed"
+        assert len(payload["artifacts"]) == 1
+        assert "official government schema" not in response.text.lower()

@@ -8,6 +8,8 @@ export function FilingSubmissionPanel({
   readiness,
   error,
   loading,
+  canCreate = true,
+  createGuardMessage,
   onCreate,
   onSubmit,
   onStatusCheck,
@@ -16,6 +18,8 @@ export function FilingSubmissionPanel({
   readiness: FilingReadinessResult | null;
   error: string | null;
   loading: boolean;
+  canCreate?: boolean;
+  createGuardMessage?: string | null;
   onCreate: () => void;
   onSubmit: () => void;
   onStatusCheck: () => void;
@@ -29,9 +33,12 @@ export function FilingSubmissionPanel({
       <p className="mt-2 text-sm text-gray-600">{filingWarning}</p>
       {(submission?.provider_mode ?? readiness?.provider_mode) !== "live" ? <p className="mt-1 text-sm text-gray-600">{mockWarning}</p> : null}
       {submission ? <p className="mt-3 text-sm font-semibold capitalize text-slate-900">Provider mode: {submission.provider_mode}</p> : null}
+      {!canCreate && createGuardMessage ? (
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{createGuardMessage}</p>
+      ) : null}
       {error ? <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
       <div className="mt-4 flex flex-wrap gap-2">
-        <button className="rounded-full bg-slate-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-300" disabled={loading} onClick={onCreate} type="button">
+        <button className="rounded-full bg-slate-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-300" disabled={loading || !canCreate} onClick={onCreate} type="button">
           Create draft
         </button>
         <button className="rounded-full bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-300" disabled={loading || !canSubmit} onClick={onSubmit} type="button">

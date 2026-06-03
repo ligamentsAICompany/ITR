@@ -73,7 +73,8 @@ describe("ITR export UI", () => {
       />,
     );
 
-    assert.match(html, /No active schema pack is configured/i);
+    assert.match(html, /Export validation is not configured for this ITR form and assessment year/i);
+    assert.match(html, /Load or activate a demo schema pack/i);
     assert.doesNotMatch(html, /Download official export/i);
     assert.match(html, /has not been submitted to the Income Tax Department/i);
   });
@@ -116,6 +117,7 @@ describe("ITR export UI", () => {
     assert.match(failedHtml, /TaxPaid/);
     assert.match(readyHtml, /Download official export/);
     assert.match(readyHtml, /Schema validation means the payload matched the configured schema pack/i);
+    assert.match(readyHtml, /Synthetic demo schema packs are for demo validation only/i);
   });
 
   it("keeps previous panels visible and shows friendly errors", () => {

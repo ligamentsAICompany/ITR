@@ -181,6 +181,16 @@ def test_consent_request_grant_revoke_and_expired_or_revoked_block_submission():
 
 def test_approval_request_approve_reject_and_role_boundaries():
     package, export, _submission = create_submission()
+    ITR_EXPORT_CACHE[export.export_id] = export.model_copy(update={"status": ItrExportStatus.NOT_CONFIGURED})
+    blocked = client.post(
+        "/v1/filing/approvals/request",
+        json={"package_id": package.package_id, "export_id": export.export_id},
+        headers=auth(),
+    )
+    assert blocked.status_code == 400
+    assert blocked.json()["detail"] == "Approval cannot be requested yet because schema export is not ready. Please generate a schema-validated export first."
+
+    ITR_EXPORT_CACHE[export.export_id] = export
     request = client.post(
         "/v1/filing/approvals/request",
         json={"package_id": package.package_id, "export_id": export.export_id},
@@ -209,6 +219,7 @@ def test_approval_request_approve_reject_and_role_boundaries():
 
 def test_mock_submission_status_everification_and_acknowledgement_lifecycle():
     package, export, submission = create_submission()
+    blocked = client.post(f"/v1/filing/submissions/{submission['submission_id']}/submit", json={}, headers=auth())
     grant_consent(package, export)
     approve(package, export)
 
@@ -219,6 +230,8 @@ def test_mock_submission_status_everification_and_acknowledgement_lifecycle():
     everify_status = client.get(f"/v1/filing/submissions/{submission['submission_id']}/everification", headers=auth())
     ack = client.get(f"/v1/filing/submissions/{submission['submission_id']}/acknowledgement", headers=auth())
 
+    assert blocked.status_code == 400
+    assert blocked.json()["detail"] == "Submission is not ready yet. Complete consent, reviewer approval, and export validation first."
     assert early_ack.status_code == 404
     assert submitted.status_code == 200, submitted.text
     assert submitted.json()["submission_status"] == SubmissionStatus.SUBMITTED

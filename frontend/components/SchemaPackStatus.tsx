@@ -12,7 +12,7 @@ export function SchemaPackStatus({ exportResult }: { exportResult: ItrExport | n
   if (exportResult.status === "not_configured") {
     return (
       <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-        No active schema pack is configured for {exportResult.candidate_itr} / {exportResult.assessment_year}. Export validation is safely blocked.
+        Export validation is not configured for this ITR form and assessment year. Load or activate a demo schema pack before requesting approval or mock filing.
       </p>
     );
   }

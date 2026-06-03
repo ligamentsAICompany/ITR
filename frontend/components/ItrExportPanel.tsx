@@ -34,6 +34,9 @@ export function ItrExportPanel({
           <p className="mt-1 text-sm leading-6 text-gray-600">
             Schema validation means the payload matched the configured schema pack. It does not mean the return has been filed or accepted.
           </p>
+          <p className="mt-1 text-sm leading-6 text-gray-600">
+            Synthetic demo schema packs are for demo validation only and are not official government schemas.
+          </p>
         </div>
         <button
           type="button"

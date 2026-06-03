@@ -17,10 +17,13 @@ from app.core.errors import (
 from app.core.logging import configure_logging, request_response_logging_middleware
 from app.core.rate_limit import rate_limit_middleware
 from app.core.request_validation import request_validation_middleware
+from app.tools.load_demo_schema_packs import load_demo_schema_packs
 
 configure_logging()
 settings = get_settings()
 settings.validate_startup()
+if settings.auto_load_demo_schema_packs and settings.environment == "demo":
+    load_demo_schema_packs()
 
 app = FastAPI(
     title="Deterministic ITR Classification API",

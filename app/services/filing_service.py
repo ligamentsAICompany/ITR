@@ -83,7 +83,7 @@ class FilingService:
         self._require_access(session, package)
         self._require_access(session, export)
         if export.status != "ready_for_download" or export.validation_result.status == "failed":
-            raise ValueError("Failed validation blocks approval")
+            raise ValueError("Approval cannot be requested yet because schema export is not ready. Please generate a schema-validated export first.")
         approval = FilingApproval(
             package_id=package_id,
             export_id=export_id,
@@ -141,7 +141,7 @@ class FilingService:
             submission.submission_status = SubmissionStatus.BLOCKED
             submission.updated_at = datetime.now(UTC)
             self.submission_repository.save(submission)
-            raise ValueError(f"Filing submission is blocked: {', '.join(readiness.blockers)}")
+            raise ValueError("Submission is not ready yet. Complete consent, reviewer approval, and export validation first.")
         provider = get_filing_provider()
         validation = provider.validate_export_payload(package_id=submission.package_id, export_id=submission.export_id, payload=None)
         if not validation.success:

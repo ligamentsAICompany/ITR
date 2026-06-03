@@ -17,6 +17,7 @@ import type {
   FilingConsent,
   FilingReadinessResult,
   FilingSubmission,
+  ItrExport,
 } from "../types/itr";
 
 const readiness: FilingReadinessResult = {
@@ -74,6 +75,30 @@ const submission: FilingSubmission = {
   updated_at: "2026-05-30T00:00:00Z",
 };
 
+const readyExport: ItrExport = {
+  export_id: "exp-1",
+  package_id: "pkg-1",
+  assessment_year: "2026-27",
+  previous_year: "2025-26",
+  candidate_itr: "ITR-3",
+  schema_pack_id: "schema-1",
+  status: "ready_for_download",
+  validation_result: {
+    validation_id: "schema-val-1",
+    schema_pack_id: "schema-1",
+    candidate_itr: "ITR-3",
+    assessment_year: "2026-27",
+    status: "passed",
+    errors: [],
+    warnings: [],
+    validated_at: "2026-05-30T00:00:00Z",
+  },
+  artifacts: [],
+  warnings: [],
+  created_at: "2026-05-30T00:00:00Z",
+  updated_at: "2026-05-30T00:00:00Z",
+};
+
 describe("filing integration UI", () => {
   it("renders readiness blockers, actions, mode badge, disclaimers, and disabled submit", () => {
     const html = renderToStaticMarkup(
@@ -112,7 +137,17 @@ describe("filing integration UI", () => {
     const html = renderToStaticMarkup(
       <>
         <FilingConsentPanel consent={consent} error="Please sign in before continuing." loading={false} onRequest={() => undefined} onGrant={() => undefined} onRevoke={() => undefined} />
-        <FilingApprovalPanel approval={approval} canApprove={true} error="You do not have access to this record." loading={false} onRequest={() => undefined} onApprove={() => undefined} onReject={() => undefined} />
+        <FilingApprovalPanel
+          approval={approval}
+          canApprove={true}
+          canRequest={true}
+          guardMessage={null}
+          error="You do not have access to this record."
+          loading={false}
+          onRequest={() => undefined}
+          onApprove={() => undefined}
+          onReject={() => undefined}
+        />
         <EVerificationPanel submission={{ ...submission, everification_status: "initiated" }} loading={false} onInitiate={() => undefined} onRefresh={() => undefined} />
         <AcknowledgementPanel acknowledgement={acknowledgement} error={null} loading={false} onRefresh={() => undefined} />
       </>,
@@ -127,6 +162,62 @@ describe("filing integration UI", () => {
     assert.match(html, /MOCK-ACK-1234/i);
     assert.match(html, /Please sign in/i);
     assert.match(html, /do not have access/i);
+  });
+
+  it("guards approval and submission buttons before export readiness", () => {
+    const approvalGuardHtml = renderToStaticMarkup(
+      <FilingApprovalPanel
+        approval={null}
+        canApprove={false}
+        canRequest={false}
+        guardMessage="Approval cannot be requested yet because schema export is not ready. Please generate a schema-validated export first."
+        error={null}
+        loading={false}
+        onRequest={() => undefined}
+        onApprove={() => undefined}
+        onReject={() => undefined}
+      />,
+    );
+    const submissionGuardHtml = renderToStaticMarkup(
+      <FilingSubmissionPanel
+        submission={submission}
+        readiness={readiness}
+        error="Submission is not ready yet. Complete consent, reviewer approval, and export validation first."
+        loading={false}
+        canCreate={false}
+        createGuardMessage="Generate a schema-validated export before creating a filing submission."
+        onCreate={() => undefined}
+        onSubmit={() => undefined}
+        onStatusCheck={() => undefined}
+      />,
+    );
+
+    assert.match(approvalGuardHtml, /Approval cannot be requested yet because schema export is not ready/i);
+    assert.match(approvalGuardHtml, /disabled=""/);
+    assert.match(submissionGuardHtml, /Submission is not ready yet\. Complete consent, reviewer approval, and export validation first\./);
+    assert.match(submissionGuardHtml, /Generate a schema-validated export before creating a filing submission\./);
+    assert.match(submissionGuardHtml, /disabled=""/);
+    assert.doesNotMatch(`${approvalGuardHtml}${submissionGuardHtml}`, /\/v1\/filing/);
+  });
+
+  it("enables approval request when export is ready for download", () => {
+    const html = renderToStaticMarkup(
+      <FilingApprovalPanel
+        approval={null}
+        canApprove={false}
+        canRequest={readyExport.status === "ready_for_download"}
+        guardMessage={null}
+        error={null}
+        loading={false}
+        onRequest={() => undefined}
+        onApprove={() => undefined}
+        onReject={() => undefined}
+      />,
+    );
+
+    assert.doesNotMatch(html, /Approval cannot be requested/i);
+    assert.match(html, /<button[^>]*>Request approval<\/button>/);
+    assert.match(html, /Request approval/);
   });
 
   it("renders provider diagnostics, live warning, missing config, retryable error, and capabilities", () => {
