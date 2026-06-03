@@ -49,6 +49,7 @@ RUN python3 -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+COPY demo_data ./demo_data
 COPY itr_engine ./itr_engine
 COPY scripts/start-fullstack.sh ./scripts/start-fullstack.sh
 

@@ -1,5 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
+from pathlib import Path
 
 from app.core.config import Settings, get_settings
 from app.main import app
@@ -219,3 +220,10 @@ def test_demo_defaults_do_not_require_gcp_secret_manager_gcs_or_jwt(monkeypatch)
     assert settings.gcs_bucket_name is None
     assert settings.jwt_secret is None
     assert settings.jwt_jwks_url is None
+
+
+def test_cloud_run_image_includes_demo_schema_packs():
+    dockerfile = Path(__file__).resolve().parents[1] / "Dockerfile"
+    content = dockerfile.read_text(encoding="utf-8")
+
+    assert "COPY demo_data ./demo_data" in content
