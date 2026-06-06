@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.core.rate_limit import rate_limiter
-from app.core.security import mask_aadhaar, mask_pan
+from app.core.security import mask_aadhaar, mask_pan, sanitize_for_log
 from app.main import app
 
 
@@ -11,6 +11,20 @@ client = TestClient(app)
 def test_masks_sensitive_identifiers():
     assert mask_pan("ABCDE1234F") == "ABCDE****F"
     assert mask_aadhaar("123456789012") == "**** **** 9012"
+
+
+def test_sanitizer_masks_sensitive_patterns_in_unknown_fields():
+    sanitized = sanitize_for_log(
+        {
+            "loc": ["body", "raw_text"],
+            "input": "PAN ABCDE1234F Aadhaar 123456789012",
+        }
+    )
+
+    assert "ABCDE1234F" not in str(sanitized)
+    assert "123456789012" not in str(sanitized)
+    assert "ABCDE****F" in str(sanitized)
+    assert "**** **** 9012" in str(sanitized)
 
 
 def test_normalize_bad_pan_returns_400_without_echoing_sensitive_values():
@@ -30,6 +44,25 @@ def test_normalize_bad_pan_returns_400_without_echoing_sensitive_values():
     assert "invalid_schema" in body
     assert "BADPAN" not in body
     assert "123456789012" not in body
+
+
+def test_normalize_bad_aadhaar_returns_400_if_frontend_is_bypassed():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "ABCDE1234F",
+            "aadhaar_number": "12345",
+            "assessment_year": "2026-27",
+            "entity_type": "individual",
+            "residency_status": "resident",
+        },
+    )
+
+    body = response.text
+    assert response.status_code == 400
+    assert "invalid_schema" in body
+    assert "aadhaar_number" in body
+    assert "12345" not in body
 
 
 def test_malformed_json_is_rejected_early():

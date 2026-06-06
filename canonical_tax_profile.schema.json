@@ -1,14 +1,1386 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "canonical-tax-profile/v0.1",
-  "title": "Canonical Tax Profile",
-  "type": "object",
+  "$defs": {
+    "BusinessProfessionIncome": {
+      "additionalProperties": false,
+      "properties": {
+        "has_income": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Has Income",
+          "type": "string"
+        },
+        "gross_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gross Amount"
+        },
+        "nature": {
+          "anyOf": [
+            {
+              "enum": [
+                "business",
+                "profession",
+                "both",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nature"
+        },
+        "presumptive_taxation": {
+          "default": "unknown",
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Presumptive Taxation",
+          "type": "string"
+        },
+        "section_44ad_applicable": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section 44Ad Applicable"
+        },
+        "section_44ada_applicable": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section 44Ada Applicable"
+        },
+        "section_44ae_applicable": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section 44Ae Applicable"
+        }
+      },
+      "required": [
+        "has_income"
+      ],
+      "title": "BusinessProfessionIncome",
+      "type": "object"
+    },
+    "CapitalGainsIncome": {
+      "additionalProperties": false,
+      "properties": {
+        "has_income": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Has Income",
+          "type": "string"
+        },
+        "gross_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gross Amount"
+        },
+        "has_short_term_gains": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Short Term Gains"
+        },
+        "has_long_term_gains": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Long Term Gains"
+        },
+        "has_equity_or_mutual_fund_gains": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Equity Or Mutual Fund Gains"
+        },
+        "has_stcg": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Stcg"
+        },
+        "stcg_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stcg Amount"
+        },
+        "has_ltcg_112a": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Ltcg 112A"
+        },
+        "ltcg_112a_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ltcg 112A Amount"
+        },
+        "has_other_ltcg": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Other Ltcg"
+        },
+        "other_ltcg_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Other Ltcg Amount"
+        },
+        "has_land_or_building_gains": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Land Or Building Gains"
+        },
+        "has_land_building_gains": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Land Building Gains"
+        },
+        "has_special_rate_capital_gains": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Special Rate Capital Gains"
+        }
+      },
+      "required": [
+        "has_income"
+      ],
+      "title": "CapitalGainsIncome",
+      "type": "object"
+    },
+    "DeductionClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "section_code": {
+          "title": "Section Code",
+          "type": "string"
+        },
+        "amount": {
+          "minimum": 0,
+          "title": "Amount",
+          "type": "number"
+        }
+      },
+      "required": [
+        "section_code",
+        "amount"
+      ],
+      "title": "DeductionClaim",
+      "type": "object"
+    },
+    "Deductions": {
+      "additionalProperties": false,
+      "properties": {
+        "has_deductions": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Has Deductions",
+          "type": "string"
+        },
+        "section_claims": {
+          "items": {
+            "$ref": "#/$defs/DeductionClaim"
+          },
+          "title": "Section Claims",
+          "type": "array"
+        },
+        "section_80c_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section 80C Amount"
+        },
+        "section_80d_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section 80D Amount"
+        },
+        "section_80g_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section 80G Amount"
+        },
+        "nps_80ccd1b_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nps 80Ccd1B Amount"
+        }
+      },
+      "required": [
+        "has_deductions"
+      ],
+      "title": "Deductions",
+      "type": "object"
+    },
+    "EvidenceDocument": {
+      "additionalProperties": false,
+      "properties": {
+        "document_id": {
+          "title": "Document Id",
+          "type": "string"
+        },
+        "document_type": {
+          "title": "Document Type",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "field_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Field Paths",
+          "type": "array"
+        }
+      },
+      "required": [
+        "document_id",
+        "document_type",
+        "sha256"
+      ],
+      "title": "EvidenceDocument",
+      "type": "object"
+    },
+    "EvidenceSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "documents": {
+          "items": {
+            "$ref": "#/$defs/EvidenceDocument"
+          },
+          "title": "Documents",
+          "type": "array"
+        }
+      },
+      "title": "EvidenceSummary",
+      "type": "object"
+    },
+    "ExemptionsFlags": {
+      "additionalProperties": false,
+      "properties": {
+        "claims_section_11_exemption": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Claims Section 11 Exemption",
+          "type": "string"
+        },
+        "trust_or_institution_case": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Trust Or Institution Case",
+          "type": "string"
+        },
+        "political_party_case": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Political Party Case",
+          "type": "string"
+        },
+        "university_or_research_case": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "University Or Research Case",
+          "type": "string"
+        }
+      },
+      "required": [
+        "claims_section_11_exemption",
+        "trust_or_institution_case",
+        "political_party_case",
+        "university_or_research_case"
+      ],
+      "title": "ExemptionsFlags",
+      "type": "object"
+    },
+    "ForeignAssets": {
+      "additionalProperties": false,
+      "properties": {
+        "has_foreign_assets": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Has Foreign Assets",
+          "type": "string"
+        },
+        "has_foreign_income": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Has Foreign Income",
+          "type": "string"
+        },
+        "has_signing_authority_outside_india": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Signing Authority Outside India"
+        }
+      },
+      "required": [
+        "has_foreign_assets",
+        "has_foreign_income"
+      ],
+      "title": "ForeignAssets",
+      "type": "object"
+    },
+    "HousePropertyIncome": {
+      "additionalProperties": false,
+      "properties": {
+        "has_income": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Has Income",
+          "type": "string"
+        },
+        "gross_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gross Amount"
+        },
+        "property_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Property Count"
+        },
+        "has_self_occupied_property": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Self Occupied Property"
+        },
+        "has_let_out_property": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Let Out Property"
+        },
+        "annual_value": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Annual Value"
+        },
+        "interest_on_housing_loan": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interest On Housing Loan"
+        }
+      },
+      "required": [
+        "has_income"
+      ],
+      "title": "HousePropertyIncome",
+      "type": "object"
+    },
+    "IncomeHeads": {
+      "additionalProperties": false,
+      "properties": {
+        "salary": {
+          "$ref": "#/$defs/SalaryIncome"
+        },
+        "house_property": {
+          "$ref": "#/$defs/HousePropertyIncome"
+        },
+        "capital_gains": {
+          "$ref": "#/$defs/CapitalGainsIncome"
+        },
+        "business_profession": {
+          "$ref": "#/$defs/BusinessProfessionIncome"
+        },
+        "other_sources": {
+          "$ref": "#/$defs/OtherSourcesIncome"
+        }
+      },
+      "required": [
+        "salary",
+        "house_property",
+        "capital_gains",
+        "business_profession",
+        "other_sources"
+      ],
+      "title": "IncomeHeads",
+      "type": "object"
+    },
+    "OtherSourcesIncome": {
+      "additionalProperties": false,
+      "properties": {
+        "has_income": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Has Income",
+          "type": "string"
+        },
+        "gross_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gross Amount"
+        },
+        "has_interest_income": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Interest Income"
+        },
+        "interest_savings_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interest Savings Amount"
+        },
+        "interest_fixed_deposit_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interest Fixed Deposit Amount"
+        },
+        "interest_other_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interest Other Amount"
+        },
+        "has_dividend_income": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Dividend Income"
+        },
+        "dividend_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dividend Amount"
+        },
+        "has_winnings_or_lottery_income": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Winnings Or Lottery Income"
+        },
+        "agricultural_income_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agricultural Income Amount"
+        }
+      },
+      "required": [
+        "has_income"
+      ],
+      "title": "OtherSourcesIncome",
+      "type": "object"
+    },
+    "ResidencyStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "resident",
+            "rnor",
+            "non_resident",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "days_in_india_current_py": {
+          "anyOf": [
+            {
+              "maximum": 366,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Days In India Current Py"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "ResidencyStatus",
+      "type": "object"
+    },
+    "ReturnFilingReason": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "unknown",
+          "enum": [
+            "voluntary",
+            "mandatory",
+            "notice",
+            "unknown"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "title": "ReturnFilingReason",
+      "type": "object"
+    },
+    "SalaryIncome": {
+      "additionalProperties": false,
+      "properties": {
+        "has_income": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Has Income",
+          "type": "string"
+        },
+        "gross_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gross Amount"
+        },
+        "employer_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Employer Count"
+        },
+        "employer_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Employer Name"
+        },
+        "has_pension_income": {
+          "anyOf": [
+            {
+              "enum": [
+                "yes",
+                "no",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Pension Income"
+        },
+        "standard_deduction": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Standard Deduction"
+        },
+        "professional_tax": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Professional Tax"
+        }
+      },
+      "required": [
+        "has_income"
+      ],
+      "title": "SalaryIncome",
+      "type": "object"
+    },
+    "SpecialConditions": {
+      "additionalProperties": false,
+      "properties": {
+        "director_in_company": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Director In Company",
+          "type": "string"
+        },
+        "unlisted_equity_held": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Unlisted Equity Held",
+          "type": "string"
+        },
+        "brought_forward_losses": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Brought Forward Losses",
+          "type": "string"
+        },
+        "esop_tax_deferred": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Esop Tax Deferred",
+          "type": "string"
+        },
+        "audit_required": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Audit Required",
+          "type": "string"
+        },
+        "presumptive_taxation_ambiguity": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Presumptive Taxation Ambiguity",
+          "type": "string"
+        },
+        "business_profession_ambiguity": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Business Profession Ambiguity",
+          "type": "string"
+        },
+        "capital_gains_edge_case": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Capital Gains Edge Case",
+          "type": "string"
+        },
+        "evidence_mismatch": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Evidence Mismatch",
+          "type": "string"
+        },
+        "low_confidence_extraction": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Low Confidence Extraction",
+          "type": "string"
+        },
+        "pack_resolution_conflict": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ],
+          "title": "Pack Resolution Conflict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "director_in_company",
+        "unlisted_equity_held",
+        "brought_forward_losses",
+        "esop_tax_deferred",
+        "audit_required",
+        "presumptive_taxation_ambiguity",
+        "business_profession_ambiguity",
+        "capital_gains_edge_case",
+        "evidence_mismatch",
+        "low_confidence_extraction",
+        "pack_resolution_conflict"
+      ],
+      "title": "SpecialConditions",
+      "type": "object"
+    },
+    "TaxPayments": {
+      "additionalProperties": false,
+      "properties": {
+        "tds_salary": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tds Salary"
+        },
+        "tds_other": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tds Other"
+        },
+        "tcs": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tcs"
+        },
+        "advance_tax": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Advance Tax"
+        },
+        "self_assessment_tax": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Self Assessment Tax"
+        }
+      },
+      "title": "TaxPayments",
+      "type": "object"
+    },
+    "TaxpayerMaster": {
+      "additionalProperties": false,
+      "properties": {
+        "full_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Full Name"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Email"
+        },
+        "mobile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mobile"
+        }
+      },
+      "title": "TaxpayerMaster",
+      "type": "object"
+    },
+    "UserIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "pan": {
+          "pattern": "^[A-Z]{5}[0-9]{4}[A-Z]$",
+          "title": "Pan",
+          "type": "string"
+        },
+        "aadhaar_number": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Aadhaar Number"
+        },
+        "aadhaar_last4": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]{4}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Aadhaar Last4"
+        }
+      },
+      "required": [
+        "pan"
+      ],
+      "title": "UserIdentity",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "enum": [
+        "canonical-tax-profile/v0.1",
+        "canonical-tax-profile/v0.2"
+      ],
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "assessment_year": {
+      "pattern": "^20\\d{2}-\\d{2}$",
+      "title": "Assessment Year",
+      "type": "string"
+    },
+    "previous_year": {
+      "anyOf": [
+        {
+          "pattern": "^20\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Previous Year"
+    },
+    "taxpayer_master": {
+      "$ref": "#/$defs/TaxpayerMaster"
+    },
+    "return_filing_reason": {
+      "$ref": "#/$defs/ReturnFilingReason"
+    },
+    "is_defective_return_case": {
+      "default": "unknown",
+      "enum": [
+        "yes",
+        "no",
+        "unknown"
+      ],
+      "title": "Is Defective Return Case",
+      "type": "string"
+    },
+    "user_identity": {
+      "$ref": "#/$defs/UserIdentity"
+    },
+    "entity_type": {
+      "enum": [
+        "individual",
+        "huf",
+        "firm",
+        "llp",
+        "company",
+        "trust",
+        "society",
+        "aop",
+        "boi",
+        "local_authority",
+        "cooperative_society",
+        "ajp",
+        "estate",
+        "business_trust",
+        "investment_fund",
+        "representative_assessee",
+        "other"
+      ],
+      "title": "Entity Type",
+      "type": "string"
+    },
+    "residency_status": {
+      "$ref": "#/$defs/ResidencyStatus"
+    },
+    "income_heads": {
+      "$ref": "#/$defs/IncomeHeads"
+    },
+    "deductions": {
+      "$ref": "#/$defs/Deductions"
+    },
+    "tax_payments": {
+      "$ref": "#/$defs/TaxPayments"
+    },
+    "foreign_assets": {
+      "$ref": "#/$defs/ForeignAssets"
+    },
+    "exemptions_flags": {
+      "$ref": "#/$defs/ExemptionsFlags"
+    },
+    "special_conditions": {
+      "$ref": "#/$defs/SpecialConditions"
+    },
+    "evidence_summary": {
+      "$ref": "#/$defs/EvidenceSummary"
+    }
+  },
   "required": [
     "schema_version",
     "assessment_year",
-    "previous_year",
-    "return_filing_reason",
-    "is_defective_return_case",
     "user_identity",
     "entity_type",
     "residency_status",
@@ -18,80 +1390,8 @@
     "exemptions_flags",
     "special_conditions"
   ],
-  "properties": {
-    "schema_version": { "const": "canonical-tax-profile/v0.1" },
-    "assessment_year": { "type": "string", "pattern": "^20\\d{2}-\\d{2}$" },
-    "previous_year": { "type": "string", "pattern": "^20\\d{2}-\\d{2}$" },
-    "return_filing_reason": {
-      "type": "object",
-      "required": ["type"],
-      "properties": {
-        "type": { "enum": ["voluntary", "mandatory", "notice", "unknown"] }
-      }
-    },
-    "is_defective_return_case": { "$ref": "#/$defs/yesNoUnknown" },
-    "user_identity": {
-      "type": "object",
-      "required": ["pan"],
-      "properties": {
-        "pan": { "type": "string", "pattern": "^[A-Z]{5}[0-9]{4}[A-Z]$" },
-        "aadhaar_number": { "type": "string", "pattern": "^[0-9]{12}$" }
-      }
-    },
-    "entity_type": {
-      "enum": ["individual", "huf", "firm", "llp", "company", "trust", "society", "aop", "boi", "local_authority", "cooperative_society", "ajp", "estate", "business_trust", "investment_fund", "representative_assessee", "other"]
-    },
-    "residency_status": {
-      "type": "object",
-      "required": ["status"],
-      "properties": {
-        "status": { "enum": ["resident", "rnor", "non_resident", "unknown"] }
-      }
-    },
-    "income_heads": {
-      "type": "object",
-      "required": ["salary", "house_property", "capital_gains", "business_profession", "other_sources"],
-      "properties": {
-        "salary": { "$ref": "#/$defs/incomeHead" },
-        "house_property": { "$ref": "#/$defs/incomeHead" },
-        "capital_gains": {
-          "allOf": [{ "$ref": "#/$defs/incomeHead" }],
-          "properties": {
-            "has_stcg": { "$ref": "#/$defs/yesNoUnknown" },
-            "has_ltcg_112a": { "$ref": "#/$defs/yesNoUnknown" },
-            "ltcg_112a_amount": { "type": "number", "minimum": 0 },
-            "has_other_ltcg": { "$ref": "#/$defs/yesNoUnknown" },
-            "has_land_building_gains": { "$ref": "#/$defs/yesNoUnknown" },
-            "has_special_rate_capital_gains": { "$ref": "#/$defs/yesNoUnknown" }
-          }
-        },
-        "business_profession": {
-          "allOf": [{ "$ref": "#/$defs/incomeHead" }],
-          "properties": {
-            "nature": { "enum": ["business", "profession", "both", "unknown"] },
-            "presumptive_taxation": { "$ref": "#/$defs/yesNoUnknown" }
-          }
-        },
-        "other_sources": {
-          "allOf": [{ "$ref": "#/$defs/incomeHead" }],
-          "properties": {
-            "has_interest_income": { "$ref": "#/$defs/yesNoUnknown" },
-            "has_winnings_or_lottery_income": { "$ref": "#/$defs/yesNoUnknown" },
-            "agricultural_income_amount": { "type": "number", "minimum": 0 }
-          }
-        }
-      }
-    }
-  },
-  "$defs": {
-    "yesNoUnknown": { "enum": ["yes", "no", "unknown"] },
-    "incomeHead": {
-      "type": "object",
-      "required": ["has_income", "gross_amount"],
-      "properties": {
-        "has_income": { "$ref": "#/$defs/yesNoUnknown" },
-        "gross_amount": { "type": "number", "minimum": 0 }
-      }
-    }
-  }
+  "title": "Canonical Tax Profile",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "canonical-tax-profile/v0.2"
 }

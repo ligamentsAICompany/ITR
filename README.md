@@ -4,6 +4,18 @@ An enterprise-grade Indian Income Tax Return (ITR) classification platform that 
 
 The deterministic backend remains the authority for every tax decision. The agent and SLM services do not decide the ITR form; they help collect missing information, structure user input, and explain the rule-based result.
 
+## Phase 5 Production Foundation
+
+Phase 5 adds a client-ready safety foundation without filing automation. It does not integrate ERI, call the Income Tax portal, retrieve acknowledgements, perform e-verification, or validate against the official ITR schema.
+
+Production requirements before real client use:
+
+- Configure real authentication upstream of `app/core/auth.py` by replacing local/demo headers with JWT, OAuth, or Google Identity verification.
+- Use `PERSISTENCE_BACKEND=postgres` with `DATABASE_URL` and add migrations before production rollout. The code fails safely with a clear `NotImplementedError` until PostgreSQL persistence is implemented.
+- Use `STORAGE_BACKEND=gcs` or an equivalent object store for generated artifacts. The current GCS path fails safely unless `GCS_BUCKET_NAME` and a production implementation are provided.
+- Keep `DEMO_AUTH_ENABLED=false` in production. Demo headers are only for local development and testing.
+- Preserve audit metadata hygiene: never store raw PAN, Aadhaar, document text, or internal storage paths in audit summaries.
+
 ## What This Project Is
 
 This project helps classify Indian taxpayers into the appropriate ITR form, from ITR-1 through ITR-7, using a canonical tax profile and deterministic eligibility rules.

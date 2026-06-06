@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -82,6 +83,65 @@ def test_normalize_returns_canonical_profile_defaults_for_partial_input():
     assert payload["return_filing_reason"]["type"] == "unknown"
     assert response.headers["x-request-id"]
     assert response.headers["x-trace-id"]
+
+
+def test_normalize_accepts_synthetic_demo_payload_with_aadhaar_alias():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "ABCDE1234F",
+            "aadhaar": "123456789012",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "salary_income": 1000000,
+            "previous_year": "2025-26",
+            "assessment_year": "2026-27",
+            "return_filing_reason": "mandatory",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["user_identity"]["pan"] == "ABCDE1234F"
+    assert payload["user_identity"]["aadhaar_number"] == "123456789012"
+    assert payload["income_heads"]["salary"]["gross_amount"] == 1000000
+    assert payload["return_filing_reason"]["type"] == "mandatory"
+
+
+def test_normalize_rejects_invalid_pan_as_invalid_schema():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "ABCDE12345",
+            "aadhaar": "123456789012",
+            "assessment_year": "2026-27",
+            "previous_year": "2025-26",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "salary_income": 1000000,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "invalid_schema"
+
+
+def test_normalize_rejects_invalid_aadhaar_alias_as_invalid_schema():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "ABCDE1234F",
+            "aadhaar": "12345",
+            "assessment_year": "2026-27",
+            "previous_year": "2025-26",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "salary_income": 1000000,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "invalid_schema"
 
 
 def test_normalize_preserves_house_property_details_from_ui_payload():
@@ -169,6 +229,128 @@ def test_normalize_keeps_capital_gains_subtype_mapping():
     assert capital_gains["has_other_ltcg"] == "no"
     assert capital_gains["has_land_building_gains"] == "no"
     assert capital_gains["has_special_rate_capital_gains"] == "no"
+
+
+@pytest.mark.parametrize("salary_income", [" ", "   "])
+def test_normalize_treats_whitespace_salary_income_as_empty(salary_income):
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "ABCDE1234F",
+            "assessment_year": "2026-27",
+            "previous_year": "2025-26",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "salary_income": salary_income,
+        },
+    )
+
+    assert response.status_code == 200
+    salary = response.json()["income_heads"]["salary"]
+    assert salary["has_income"] == "no"
+    assert salary["gross_amount"] == 0
+
+
+def test_normalize_rejects_non_numeric_salary_income_as_invalid_schema():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "ABCDE1234F",
+            "assessment_year": "2026-27",
+            "previous_year": "2025-26",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "salary_income": "abc",
+        },
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["error"] == "invalid_schema"
+    assert "abc" not in response.text
+
+
+def test_normalize_treats_whitespace_deduction_amount_as_empty():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "ABCDE1234F",
+            "assessment_year": "2026-27",
+            "previous_year": "2025-26",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "has_deductions": "yes",
+            "section_claims": [{"section_code": "80C", "amount": " "}],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["deductions"]["section_claims"] == [
+        {"section_code": "80C", "amount": 0}
+    ]
+
+
+def test_normalize_treats_whitespace_house_property_count_as_empty():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "ABCDE1234F",
+            "assessment_year": "2026-27",
+            "previous_year": "2025-26",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "house_property_count": " ",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["income_heads"]["house_property"]["property_count"] is None
+
+
+def test_normalize_accepts_trimmed_numeric_strings():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "ABCDE1234F",
+            "assessment_year": "2026-27",
+            "previous_year": "2025-26",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "salary_income": " 1200000 ",
+            "ltcg_112a_amount": " 100000 ",
+            "house_property_count": " 2 ",
+            "has_deductions": "yes",
+            "section_claims": [{"section_code": "80C", "amount": " 150000 "}],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["income_heads"]["salary"]["gross_amount"] == 1200000
+    assert payload["income_heads"]["capital_gains"]["ltcg_112a_amount"] == 100000
+    assert payload["income_heads"]["house_property"]["property_count"] == 2
+    assert payload["deductions"]["section_claims"] == [
+        {"section_code": "80C", "amount": 150000}
+    ]
+
+
+def test_normalize_empty_and_omitted_numeric_values_remain_empty():
+    response = client.post(
+        "/v1/normalize",
+        json={
+            "pan": "ABCDE1234F",
+            "assessment_year": "2026-27",
+            "previous_year": "2025-26",
+            "entity_type": "individual",
+            "residency_status": "resident",
+            "salary_income": "",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["income_heads"]["salary"]["gross_amount"] == 0
+    assert payload["income_heads"]["house_property"]["property_count"] is None
 
 
 def test_itr_decision_wraps_existing_deterministic_classifier():

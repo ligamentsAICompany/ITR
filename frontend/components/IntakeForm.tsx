@@ -1,9 +1,11 @@
 import type { BasicFormState, YesNoUnknown } from "@/types/itr";
+import { AADHAAR_INPUT_MAX_LENGTH } from "../lib/aadhaar";
 
 type IntakeFormProps = {
   form: BasicFormState;
   missingFields: string[];
   disabled: boolean;
+  aadhaarError: string | null;
   onChange: (field: keyof BasicFormState, value: string) => void;
   onSubmit: () => void;
 };
@@ -13,7 +15,14 @@ const inputClass =
 
 const labelClass = "text-sm font-medium text-gray-700";
 
-export function IntakeForm({ form, missingFields, disabled, onChange, onSubmit }: IntakeFormProps) {
+export function IntakeForm({
+  form,
+  missingFields,
+  disabled,
+  aadhaarError,
+  onChange,
+  onSubmit,
+}: IntakeFormProps) {
   const showPreviousYear = missingFields.includes("previous_year") || form.previousYear;
   const showReturnReason =
     missingFields.includes("return_filing_reason.type") || form.returnFilingReason !== "unknown";
@@ -43,9 +52,21 @@ export function IntakeForm({ form, missingFields, disabled, onChange, onSubmit }
       <div className="grid gap-5 sm:grid-cols-2">
         <TextInput label="PAN" value={form.pan} disabled={disabled} onChange={(value) => onChange("pan", value)} />
         <TextInput
+          label="Taxpayer Name"
+          value={form.taxpayerName}
+          disabled={disabled}
+          placeholder="Optional, from documents"
+          onChange={(value) => onChange("taxpayerName", value)}
+        />
+        <TextInput
           label="Aadhaar"
           value={form.aadhaar}
           disabled={disabled}
+          inputMode="numeric"
+          maxLength={AADHAAR_INPUT_MAX_LENGTH}
+          placeholder="Example: 1234 5678 9012"
+          helpText="Optional. Use 12 digits, with or without spaces."
+          errorText={aadhaarError}
           onChange={(value) => onChange("aadhaar", value)}
         />
         <SelectInput
@@ -81,6 +102,27 @@ export function IntakeForm({ form, missingFields, disabled, onChange, onSubmit }
           inputMode="numeric"
           onChange={(value) => onChange("salaryIncome", value)}
         />
+        <TextInput
+          label="Employer Name"
+          value={form.employerName}
+          disabled={disabled}
+          placeholder="Optional, from Form 16"
+          onChange={(value) => onChange("employerName", value)}
+        />
+        <TextInput
+          label="Standard Deduction"
+          value={form.standardDeduction}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("standardDeduction", value)}
+        />
+        <TextInput
+          label="Professional Tax"
+          value={form.professionalTax}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("professionalTax", value)}
+        />
         <YesNoInput
           label="House Property Income / Details"
           value={form.housePropertyHasIncome}
@@ -97,6 +139,14 @@ export function IntakeForm({ form, missingFields, disabled, onChange, onSubmit }
               placeholder="Example: 0 for self-occupied property"
               helpText="Use 0 when details exist but there is no taxable house-property amount."
               onChange={(value) => onChange("housePropertyIncome", value)}
+            />
+            <TextInput
+              label="Housing Loan Interest"
+              value={form.housePropertyInterest}
+              disabled={disabled}
+              inputMode="numeric"
+              helpText="Optional document-derived detail for the canonical profile."
+              onChange={(value) => onChange("housePropertyInterest", value)}
             />
             <TextInput
               label="Number of House Properties"
@@ -157,6 +207,20 @@ export function IntakeForm({ form, missingFields, disabled, onChange, onSubmit }
           helpText="Use 0 if section 112A does not apply."
           onChange={(value) => onChange("ltcg112AAmount", value)}
         />
+        <TextInput
+          label="STCG Amount"
+          value={form.stcgAmount}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("stcgAmount", value)}
+        />
+        <TextInput
+          label="Other LTCG Amount"
+          value={form.otherLtcgAmount}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("otherLtcgAmount", value)}
+        />
         <YesNoInput
           label="Other LTCG"
           value={form.hasOtherLtcg}
@@ -182,6 +246,49 @@ export function IntakeForm({ form, missingFields, disabled, onChange, onSubmit }
           inputMode="numeric"
           helpText="Use this for bank interest and similar income."
           onChange={(value) => onChange("otherSourcesIncome", value)}
+        />
+        <TextInput
+          label="Extracted Interest Detail"
+          value={form.otherSourcesInterest}
+          disabled={disabled}
+          inputMode="numeric"
+          helpText="Accepted bank/AIS interest can populate this before normalization."
+          onChange={(value) => onChange("otherSourcesInterest", value)}
+        />
+        <TextInput
+          label="Savings Interest"
+          value={form.savingsInterest}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("savingsInterest", value)}
+        />
+        <TextInput
+          label="Fixed Deposit Interest"
+          value={form.fixedDepositInterest}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("fixedDepositInterest", value)}
+        />
+        <TextInput
+          label="TDS Salary"
+          value={form.tdsSalary}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("tdsSalary", value)}
+        />
+        <TextInput
+          label="TDS Other"
+          value={form.tdsOther}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("tdsOther", value)}
+        />
+        <TextInput
+          label="TCS"
+          value={form.tcs}
+          disabled={disabled}
+          inputMode="numeric"
+          onChange={(value) => onChange("tcs", value)}
         />
         <TextInput
           label="Agricultural Income"
@@ -329,6 +436,7 @@ export function IntakeForm({ form, missingFields, disabled, onChange, onSubmit }
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <button
           type="button"
+          data-testid="run-agent-workflow"
           disabled={disabled}
           onClick={onSubmit}
           className="cursor-pointer rounded-lg bg-[#22c55e] px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-[#22c55e]/30 disabled:cursor-not-allowed disabled:opacity-70"
@@ -354,8 +462,10 @@ function TextInput({
   disabled,
   animated,
   inputMode,
+  maxLength,
   placeholder,
   helpText,
+  errorText,
   onChange,
 }: {
   label: string;
@@ -363,8 +473,10 @@ function TextInput({
   disabled: boolean;
   animated?: boolean;
   inputMode?: "numeric";
+  maxLength?: number;
   placeholder?: string;
   helpText?: string;
+  errorText?: string | null;
   onChange: (value: string) => void;
 }) {
   return (
@@ -375,9 +487,12 @@ function TextInput({
         value={value}
         disabled={disabled}
         inputMode={inputMode}
+        maxLength={maxLength}
         placeholder={placeholder}
+        aria-invalid={errorText ? true : undefined}
         onChange={(event) => onChange(event.target.value)}
       />
+      {errorText ? <span className="mt-1 block text-xs font-medium text-red-600">{errorText}</span> : null}
       {helpText ? <span className="mt-1 block text-xs text-gray-500">{helpText}</span> : null}
     </label>
   );

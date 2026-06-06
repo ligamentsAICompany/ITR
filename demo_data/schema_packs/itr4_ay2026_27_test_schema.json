@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demo.local/schemas/itr4-ay2026-27-synthetic-test.schema.json",
+  "title": "Synthetic Demo ITR-4 AY 2026-27 Export Test Schema",
+  "description": "Synthetic test schema pack only. Not official government schema. For demo validation only.",
+  "type": "object",
+  "required": [
+    "assessment_year",
+    "previous_year",
+    "itr_form",
+    "selected_regime",
+    "gross_total_income",
+    "business_profession_income",
+    "taxable_income",
+    "total_tax_liability",
+    "refund_due",
+    "tax_payable"
+  ],
+  "properties": {
+    "assessment_year": {
+      "type": "string",
+      "const": "2026-27"
+    },
+    "previous_year": {
+      "type": "string",
+      "const": "2025-26"
+    },
+    "itr_form": {
+      "type": "string",
+      "const": "ITR-4"
+    },
+    "candidate_itr": {
+      "type": "string",
+      "const": "ITR-4"
+    },
+    "selected_regime": {
+      "type": "string",
+      "enum": ["old", "new"]
+    },
+    "gross_total_income": {
+      "type": "number",
+      "minimum": 0
+    },
+    "salary_income": {
+      "type": "number",
+      "minimum": 0
+    },
+    "business_profession_income": {
+      "type": "number",
+      "minimum": 0
+    },
+    "capital_gains_income": {
+      "type": "number"
+    },
+    "other_sources_income": {
+      "type": "number"
+    },
+    "taxable_income": {
+      "type": "number",
+      "minimum": 0
+    },
+    "total_tax_liability": {
+      "type": "number",
+      "minimum": 0
+    },
+    "refund_due": {
+      "type": "number",
+      "minimum": 0
+    },
+    "tax_payable": {
+      "type": "number",
+      "minimum": 0
+    },
+    "tds_salary": {
+      "type": "number",
+      "minimum": 0
+    },
+    "tds_other": {
+      "type": "number",
+      "minimum": 0
+    },
+    "tcs": {
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "x-itr": {
+    "assessment_year": "2026-27",
+    "previous_year": "2025-26",
+    "itr_form": "ITR-4",
+    "schema_version": "synthetic-demo-itr4-ay2026-27-v1",
+    "schema_kind": "synthetic_demo_test",
+    "disclaimer": "Synthetic test schema pack only. Not official government schema. For demo validation only."
+  },
+  "x-itr-field-map": {}
+}

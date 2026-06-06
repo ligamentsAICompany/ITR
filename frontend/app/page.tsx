@@ -1,27 +1,82 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AgentPanel } from "@/components/AgentPanel";
 import { DecisionCard } from "@/components/DecisionCard";
+import { DemoAuthPanel } from "@/components/DemoAuthPanel";
+import { DocumentUploadCenter } from "@/components/DocumentUploadCenter";
 import { EscalationAlert } from "@/components/EscalationAlert";
+import { ExtractionReviewPanel } from "@/components/ExtractionReviewPanel";
+import { AcknowledgementPanel } from "@/components/AcknowledgementPanel";
+import { EVerificationPanel } from "@/components/EVerificationPanel";
+import { FilingApprovalPanel } from "@/components/FilingApprovalPanel";
+import { FilingConsentPanel } from "@/components/FilingConsentPanel";
+import { FilingPackagePanel } from "@/components/FilingPackagePanel";
+import { FilingReadinessPanel } from "@/components/FilingReadinessPanel";
+import { FilingSubmissionPanel } from "@/components/FilingSubmissionPanel";
+import { ProviderErrorPanel } from "@/components/ProviderErrorPanel";
+import { ProviderStatusPanel } from "@/components/ProviderStatusPanel";
 import { IntakeForm } from "@/components/IntakeForm";
+import { ItrExportPanel } from "@/components/ItrExportPanel";
 import { Navbar } from "@/components/Navbar";
 import { Spinner } from "@/components/Spinner";
+import { TaxComputationPanel } from "@/components/TaxComputationPanel";
+import { ValidationReportPanel } from "@/components/ValidationReportPanel";
 import { WorkflowLog } from "@/components/WorkflowLog";
 import {
+  computeTax,
+  approveFilingApproval,
+  checkFilingReadiness,
+  createFilingSubmission,
+  downloadFilingPackageArtifact,
+  downloadItrExportArtifact,
+  generateFilingPackage,
+  generateItrExport,
+  getAcknowledgement,
   getClarification,
   getDecision,
+  getEVerificationStatus,
   getExplanation,
   getMissingFields,
+  getProviderDiagnostics,
+  grantFilingConsent,
+  initiateEVerification,
+  applyMergedPayloadToForm,
+  mergeExtractionFields,
   normalizeProfile,
+  refreshFilingStatus,
+  rejectFilingApproval,
+  requestFilingApproval,
+  requestFilingConsent,
+  runValidation,
+  revokeFilingConsent,
+  submitFilingSubmission,
 } from "@/lib/api";
+import { validateAadhaar } from "@/lib/aadhaar";
+import { getDemoAuthContext } from "@/lib/auth";
 import { maskSensitiveProfile } from "@/lib/security";
+import { validateWorkflowInput } from "@/lib/workflowValidation";
 import type {
   BasicFormState,
+  Acknowledgement,
   CanonicalTaxProfile,
   ClarificationResponse,
+  DocumentRecord,
+  DraftItrPayload,
+  ExtractionResult,
   ExplanationResponse,
+  FilingApproval,
+  FilingConsent,
+  FilingPackage,
+  FilingPackageArtifact,
+  FilingReadinessResult,
+  FilingSubmission,
   ITRDecisionResponse,
+  ItrExport,
+  ItrExportArtifact,
+  ProviderDiagnostics,
+  TaxComputationResult,
+  ValidationReport,
 } from "@/types/itr";
 
 const highRiskFields = ["foreign_assets", "business_profession", "capital_gains", "exemptions_flags"];
@@ -29,9 +84,14 @@ const highRiskFields = ["foreign_assets", "business_profession", "capital_gains"
 const initialForm: BasicFormState = {
   pan: "ABCDE1234F",
   aadhaar: "",
+  taxpayerName: "",
   entityType: "individual",
   residency: "resident",
   salaryIncome: "1200000",
+  employerName: "",
+  grossSalary: "1200000",
+  standardDeduction: "",
+  professionalTax: "",
   housePropertyHasIncome: "no",
   housePropertyIncome: "0",
   housePropertyCount: "0",
@@ -42,11 +102,20 @@ const initialForm: BasicFormState = {
   hasStcg: "no",
   hasLtcg112A: "no",
   ltcg112AAmount: "0",
+  stcgAmount: "",
+  otherLtcgAmount: "",
   hasOtherLtcg: "no",
   hasLandBuildingGains: "no",
   hasSpecialRateCapitalGains: "no",
   otherSourcesIncome: "0",
+  otherSourcesInterest: "0",
+  savingsInterest: "",
+  fixedDepositInterest: "",
   agriculturalIncome: "0",
+  housePropertyInterest: "",
+  tdsSalary: "",
+  tdsOther: "",
+  tcs: "",
   previousYear: "2025-26",
   returnFilingReason: "voluntary",
   isDefectiveReturnCase: "no",
@@ -77,6 +146,26 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [unresolvedFields, setUnresolvedFields] = useState<string[]>([]);
+  const [uploadedDocument, setUploadedDocument] = useState<DocumentRecord | null>(null);
+  const [extraction, setExtraction] = useState<ExtractionResult | null>(null);
+  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [extractions, setExtractions] = useState<ExtractionResult[]>([]);
+  const [approvedFieldIds, setApprovedFieldIds] = useState<string[]>([]);
+  const [validationReport, setValidationReport] = useState<ValidationReport | null>(null);
+  const [taxComputation, setTaxComputation] = useState<TaxComputationResult | null>(null);
+  const [filingPackage, setFilingPackage] = useState<FilingPackage | null>(null);
+  const [draftPayload, setDraftPayload] = useState<DraftItrPayload | null>(null);
+  const [filingPackageError, setFilingPackageError] = useState<string | null>(null);
+  const [itrExport, setItrExport] = useState<ItrExport | null>(null);
+  const [itrExportError, setItrExportError] = useState<string | null>(null);
+  const [filingSubmission, setFilingSubmission] = useState<FilingSubmission | null>(null);
+  const [filingReadiness, setFilingReadiness] = useState<FilingReadinessResult | null>(null);
+  const [providerDiagnostics, setProviderDiagnostics] = useState<ProviderDiagnostics | null>(null);
+  const [filingConsent, setFilingConsent] = useState<FilingConsent | null>(null);
+  const [filingApproval, setFilingApproval] = useState<FilingApproval | null>(null);
+  const [acknowledgement, setAcknowledgement] = useState<Acknowledgement | null>(null);
+  const [filingWorkflowError, setFilingWorkflowError] = useState<string | null>(null);
+  const [demoAuthContext, setDemoAuthContextState] = useState(() => getDemoAuthContext());
 
   const questions = useMemo(
     () => (clarification?.question ? [clarification.question] : []),
@@ -86,13 +175,82 @@ export default function Home() {
     () => getProgressState({ decision, explanation, clarification, missingFields, escalation, loading, error }),
     [decision, explanation, clarification, missingFields, escalation, loading, error],
   );
+  const aadhaarError = useMemo(() => validateAadhaar(form.aadhaar).error, [form.aadhaar]);
+
+  useEffect(() => {
+    void getProviderDiagnostics()
+      .then(setProviderDiagnostics)
+      .catch(() => {
+        setProviderDiagnostics(null);
+      });
+  }, []);
 
   function updateForm(field: keyof BasicFormState, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
+    clearFilingPackage();
   }
 
   function pushLog(message: string) {
     setLogs((current) => [...current, message]);
+  }
+
+  function clearFilingPackage() {
+    setFilingPackage(null);
+    setDraftPayload(null);
+    setFilingPackageError(null);
+    clearItrExport();
+  }
+
+  function clearItrExport() {
+    setItrExport(null);
+    setItrExportError(null);
+    clearFilingWorkflow();
+  }
+
+  function clearFilingWorkflow() {
+    setFilingSubmission(null);
+    setFilingReadiness(null);
+    setFilingConsent(null);
+    setFilingApproval(null);
+    setAcknowledgement(null);
+    setFilingWorkflowError(null);
+  }
+
+  function handleExtraction(document: DocumentRecord, extractionResult: ExtractionResult) {
+    setUploadedDocument(document);
+    setExtraction(extractionResult);
+    setDocuments((current) => [...current.filter((item) => item.document_id !== document.document_id), document]);
+    setExtractions((current) => [
+      ...current.filter((item) => item.document_id !== extractionResult.document_id),
+      extractionResult,
+    ]);
+    clearFilingPackage();
+    pushLog(`extract: ${extractionResult.fields.length} candidate field(s) ready for review`);
+  }
+
+  async function acceptExtractedFields(fieldIds: string[], reviewedExtraction = extraction) {
+    if (!extraction) {
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      pushLog("merge: POST /v1/intake/merge-extractions");
+      const mergeResult = await mergeExtractionFields(form, reviewedExtraction ?? extraction, fieldIds);
+      const nextForm = normalizeDocumentMerge(applyMergedPayloadToForm(form, mergeResult.merged_payload));
+      setForm(nextForm);
+      clearFilingPackage();
+      setApprovedFieldIds((current) => [...new Set([...current, ...mergeResult.applied_field_ids])]);
+      setExtractions((current) => [
+        ...current.filter((item) => item.document_id !== (reviewedExtraction ?? extraction).document_id),
+        reviewedExtraction ?? extraction,
+      ]);
+      pushLog(`merge: accepted ${mergeResult.applied_field_ids.length} reviewed field(s)`);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Could not merge extracted fields.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function runWorkflow(nextForm = form, options: { resetLogs?: boolean; unresolvedFields?: string[] } = {}) {
@@ -102,6 +260,12 @@ export default function Home() {
     setError(null);
     setEscalation(false);
     setDecision(null);
+    setValidationReport(null);
+    setTaxComputation(null);
+    setFilingPackage(null);
+    setDraftPayload(null);
+    setFilingPackageError(null);
+    clearItrExport();
     setMissingFields([]);
     setProfile(null);
     setExplanation(null);
@@ -112,7 +276,7 @@ export default function Home() {
     setUnresolvedFields(nextUnresolvedFields);
 
     try {
-      const validationError = validateForm(nextForm);
+      const validationError = validateWorkflowInput(nextForm);
       if (validationError) {
         setError(validationError);
         pushLog(`validation: ${validationError}`);
@@ -122,6 +286,15 @@ export default function Home() {
       pushLog("normalize: POST /v1/normalize");
       const normalized = await normalizeProfile(nextForm);
       setProfile(normalized);
+
+      pushLog("validation: POST /v1/validation/run");
+      const validationResult = await runValidation({
+        profile: normalized,
+        documents,
+        extractions,
+        approvedFieldIds,
+      });
+      setValidationReport(validationResult);
 
       pushLog("decision: POST /v1/itr-decision");
       const decisionResult = await getDecision(normalized);
@@ -164,6 +337,14 @@ export default function Home() {
       const explanationResult = await getExplanation(decisionResult);
       setExplanation(explanationResult);
 
+      pushLog("tax: POST /v1/tax/compute");
+      const taxResult = await computeTax({
+        profile: normalized,
+        decision: decisionResult,
+        validationReport: validationResult,
+      });
+      setTaxComputation(taxResult);
+
       if (
         decisionResult.confidence === "low" ||
         decisionResult.reason_codes.includes("HUMAN_REVIEW_SIGNAL_PRESENT")
@@ -175,6 +356,325 @@ export default function Home() {
       const message = caughtError instanceof Error ? caughtError.message : "Unexpected frontend error";
       setError(message);
       pushLog(`error: ${message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGenerateFilingPackage() {
+    if (!profile || !decision || !validationReport || !taxComputation) {
+      setFilingPackageError("Run ITR recommendation, validation, and tax computation before generating a package.");
+      return;
+    }
+
+    setLoading(true);
+    setFilingPackageError(null);
+    try {
+      pushLog("filing-package: POST /v1/filing-packages/generate");
+      const packageResult = await generateFilingPackage({
+        profile,
+        decision,
+        validationReport,
+        taxComputation,
+        documents,
+      });
+      setFilingPackage(packageResult);
+      clearItrExport();
+      const draftArtifact = packageResult.artifacts.find((artifact) => artifact.artifact_type === "draft_itr_payload");
+      if (draftArtifact) {
+        const blob = await downloadFilingPackageArtifact(packageResult.package_id, draftArtifact.artifact_id);
+        setDraftPayload(JSON.parse(await blob.text()) as DraftItrPayload);
+      }
+      pushLog(`filing-package: generated ${packageResult.artifacts.length} artifact(s)`);
+    } catch (caughtError) {
+      setFilingPackageError(
+        caughtError instanceof Error ? caughtError.message : "Could not generate the filing package.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDownloadArtifact(artifact: FilingPackageArtifact) {
+    if (!filingPackage) {
+      return;
+    }
+
+    try {
+      const blob = await downloadFilingPackageArtifact(filingPackage.package_id, artifact.artifact_id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = artifact.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (caughtError) {
+      setFilingPackageError(
+        caughtError instanceof Error ? caughtError.message : "Could not download the selected artifact.",
+      );
+    }
+  }
+
+  async function handleGenerateItrExport() {
+    if (!profile || !decision || !validationReport || !taxComputation || !filingPackage) {
+      setItrExportError("Generate a filing package before creating the official-schema export.");
+      return;
+    }
+
+    setLoading(true);
+    setItrExportError(null);
+    try {
+      pushLog("itr-export: POST /v1/itr-exports/generate");
+      const exportResult = await generateItrExport({
+        packageId: filingPackage.package_id,
+        profile,
+        decision,
+        validationReport,
+        taxComputation,
+      });
+      setItrExport(exportResult);
+      pushLog(`itr-export: ${exportResult.status.replaceAll("_", " ")}`);
+    } catch (caughtError) {
+      setItrExportError(caughtError instanceof Error ? caughtError.message : "Could not generate the official export.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDownloadItrExportArtifact(artifact: ItrExportArtifact) {
+    if (!itrExport) {
+      return;
+    }
+
+    try {
+      const blob = await downloadItrExportArtifact(itrExport.export_id, artifact);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = artifact.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (caughtError) {
+      setItrExportError(caughtError instanceof Error ? caughtError.message : "Could not download the export artifact.");
+    }
+  }
+
+  async function handleCreateFilingSubmission() {
+    if (!filingPackage || !itrExport) {
+      setFilingWorkflowError("Generate a filing package and official export before creating a filing submission.");
+      return;
+    }
+    if (!isExportReadyForFiling(itrExport)) {
+      setFilingWorkflowError("Generate a schema-validated export before creating a filing submission.");
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      pushLog("filing-submission: POST /v1/filing/submissions");
+      const submission = await createFilingSubmission(filingPackage.package_id, itrExport.export_id);
+      setFilingSubmission(submission);
+      pushLog(`filing-submission: ${submission.submission_status.replaceAll("_", " ")}`);
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not create filing submission.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCheckFilingReadiness() {
+    if (!filingSubmission) {
+      setFilingWorkflowError("Create a filing submission draft before checking readiness.");
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      const readiness = await checkFilingReadiness(filingSubmission.submission_id);
+      setFilingReadiness(readiness);
+      pushLog(`filing-readiness: ${readiness.ready ? "ready" : readiness.blockers.join(", ")}`);
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not check filing readiness.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRequestConsent() {
+    if (!filingPackage || !itrExport) {
+      setFilingWorkflowError("Generate a filing package and official export before requesting consent.");
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      const consent = await requestFilingConsent(
+        filingPackage.package_id,
+        itrExport.export_id,
+        "I consent to submit this specific validated export package through the configured filing provider.",
+      );
+      setFilingConsent(consent);
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not request filing consent.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGrantConsent() {
+    if (!filingConsent) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingConsent(await grantFilingConsent(filingConsent.consent_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not grant filing consent.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRevokeConsent() {
+    if (!filingConsent) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingConsent(await revokeFilingConsent(filingConsent.consent_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not revoke filing consent.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRequestApproval() {
+    if (!filingPackage || !itrExport) {
+      setFilingWorkflowError("Generate a filing package and official export before requesting approval.");
+      return;
+    }
+    if (!isExportReadyForFiling(itrExport)) {
+      setFilingWorkflowError("Approval cannot be requested yet because schema export is not ready. Please generate a schema-validated export first.");
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingApproval(await requestFilingApproval(filingPackage.package_id, itrExport.export_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not request filing approval.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleApproveFiling() {
+    if (!filingApproval) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingApproval(await approveFilingApproval(filingApproval.approval_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not approve filing.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRejectFiling() {
+    if (!filingApproval) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingApproval(await rejectFilingApproval(filingApproval.approval_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not reject filing.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSubmitFiling() {
+    if (!filingSubmission) {
+      return;
+    }
+    if (!filingReadiness?.ready) {
+      setFilingWorkflowError("Submission is not ready yet. Complete consent, reviewer approval, and export validation first.");
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingSubmission(await submitFilingSubmission(filingSubmission.submission_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not submit through provider.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRefreshFilingStatus() {
+    if (!filingSubmission) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingSubmission(await refreshFilingStatus(filingSubmission.submission_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not refresh filing status.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleInitiateEVerification() {
+    if (!filingSubmission) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingSubmission(await initiateEVerification(filingSubmission.submission_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not initiate e-verification.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRefreshEVerification() {
+    if (!filingSubmission) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setFilingSubmission(await getEVerificationStatus(filingSubmission.submission_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Could not refresh e-verification.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRefreshAcknowledgement() {
+    if (!filingSubmission) {
+      return;
+    }
+    setLoading(true);
+    setFilingWorkflowError(null);
+    try {
+      setAcknowledgement(await getAcknowledgement(filingSubmission.submission_id));
+    } catch (caughtError) {
+      setFilingWorkflowError(caughtError instanceof Error ? caughtError.message : "Acknowledgement is not available yet.");
     } finally {
       setLoading(false);
     }
@@ -222,6 +722,16 @@ export default function Home() {
     void runWorkflow(nextForm, { resetLogs: false, unresolvedFields: nextUnresolvedFields });
   }
 
+  const currentDemoRole = demoAuthContext.role;
+  const canApproveFiling = currentDemoRole === "reviewer" || currentDemoRole === "admin";
+  const exportReadyForFiling = isExportReadyForFiling(itrExport);
+  const approvalGuardMessage = exportReadyForFiling
+    ? null
+    : "Approval cannot be requested yet because schema export is not ready. Please generate a schema-validated export first.";
+  const submissionCreateGuardMessage = exportReadyForFiling
+    ? null
+    : "Generate a schema-validated export before creating a filing submission.";
+
   return (
     <main className="min-h-screen bg-[#f9fafb]">
       <Navbar />
@@ -234,10 +744,25 @@ export default function Home() {
         </section>
 
         <div className="space-y-6">
+          <DemoAuthPanel onContextChange={setDemoAuthContextState} />
+          <DocumentUploadCenter
+            disabled={loading}
+            onExtracted={handleExtraction}
+            onLog={pushLog}
+            onError={(message) => setError(message || null)}
+          />
+          <ExtractionReviewPanel
+            document={uploadedDocument}
+            extraction={extraction}
+            disabled={loading}
+            onAccept={(fieldIds, reviewedExtraction) => void acceptExtractedFields(fieldIds, reviewedExtraction)}
+          />
+
           <IntakeForm
             form={form}
             missingFields={missingFields}
             disabled={loading}
+            aadhaarError={aadhaarError}
             onChange={updateForm}
             onSubmit={() => void runWorkflow()}
           />
@@ -268,6 +793,92 @@ export default function Home() {
           />
 
           <DecisionCard decision={decision} explanation={explanation} missingFields={missingFields} />
+          <ValidationReportPanel report={validationReport} />
+          <TaxComputationPanel result={taxComputation} validationReport={validationReport} />
+          <FilingPackagePanel
+            filingPackage={filingPackage}
+            draftPayload={draftPayload}
+            error={filingPackageError}
+            onGenerate={() => void handleGenerateFilingPackage()}
+            onDownloadArtifact={(artifact) => void handleDownloadArtifact(artifact)}
+            canGenerate={Boolean(profile && decision && validationReport && taxComputation)}
+            loading={loading}
+          />
+          <ItrExportPanel
+            filingPackage={filingPackage}
+            itrExport={itrExport}
+            error={itrExportError}
+            loading={loading}
+            canGenerate={Boolean(profile && decision && validationReport && taxComputation && filingPackage)}
+            onGenerate={() => void handleGenerateItrExport()}
+            onDownloadArtifact={(artifact) => void handleDownloadItrExportArtifact(artifact)}
+          />
+          <FilingReadinessPanel
+            readiness={filingReadiness}
+            loading={loading}
+            onCheck={() => void handleCheckFilingReadiness()}
+          />
+          <ProviderStatusPanel
+            readiness={filingReadiness}
+            submission={filingSubmission}
+            diagnostics={providerDiagnostics}
+            everificationSupported={(filingSubmission?.provider_mode ?? filingReadiness?.provider_mode ?? "mock") !== "live"}
+            acknowledgementAvailable={Boolean(acknowledgement || filingSubmission?.acknowledgement_id)}
+          />
+          <ProviderErrorPanel
+            error={
+              filingWorkflowError
+                ? {
+                    code: "PROVIDER_ERROR",
+                    safe_message: filingWorkflowError,
+                    retryable: /retry|rate|timeout|try again/i.test(filingWorkflowError),
+                    severity: "warning",
+                  }
+                : null
+            }
+          />
+          <FilingConsentPanel
+            consent={filingConsent}
+            error={filingWorkflowError}
+            loading={loading}
+            onRequest={() => void handleRequestConsent()}
+            onGrant={() => void handleGrantConsent()}
+            onRevoke={() => void handleRevokeConsent()}
+          />
+          <FilingApprovalPanel
+            approval={filingApproval}
+            canApprove={canApproveFiling}
+            canRequest={Boolean(filingPackage && exportReadyForFiling)}
+            guardMessage={approvalGuardMessage}
+            error={filingWorkflowError}
+            loading={loading}
+            onRequest={() => void handleRequestApproval()}
+            onApprove={() => void handleApproveFiling()}
+            onReject={() => void handleRejectFiling()}
+          />
+          <FilingSubmissionPanel
+            submission={filingSubmission}
+            readiness={filingReadiness}
+            error={filingWorkflowError}
+            loading={loading}
+            canCreate={Boolean(filingPackage && exportReadyForFiling)}
+            createGuardMessage={submissionCreateGuardMessage}
+            onCreate={() => void handleCreateFilingSubmission()}
+            onSubmit={() => void handleSubmitFiling()}
+            onStatusCheck={() => void handleRefreshFilingStatus()}
+          />
+          <EVerificationPanel
+            submission={filingSubmission}
+            loading={loading}
+            onInitiate={() => void handleInitiateEVerification()}
+            onRefresh={() => void handleRefreshEVerification()}
+          />
+          <AcknowledgementPanel
+            acknowledgement={acknowledgement}
+            error={filingWorkflowError}
+            loading={loading}
+            onRefresh={() => void handleRefreshAcknowledgement()}
+          />
           <EscalationAlert show={escalation} />
           <WorkflowLog logs={logs} />
 
@@ -287,6 +898,25 @@ export default function Home() {
   );
 }
 
+function normalizeDocumentMerge(form: BasicFormState): BasicFormState {
+  const nextForm = { ...form };
+  if (Number(nextForm.deduction80CAmount || 0) > 0) {
+    nextForm.has80C = "yes";
+    nextForm.hasDeductions = "yes";
+  }
+  if (Number(nextForm.deduction80DAmount || 0) > 0) {
+    nextForm.has80D = "yes";
+    nextForm.hasDeductions = "yes";
+  }
+  if (Number(nextForm.otherSourcesInterest || 0) > 0 && Number(nextForm.otherSourcesIncome || 0) === 0) {
+    nextForm.otherSourcesIncome = nextForm.otherSourcesInterest;
+  }
+  if (Number(nextForm.salaryIncome || 0) === 0 && Number(nextForm.grossSalary || 0) > 0) {
+    nextForm.salaryIncome = nextForm.grossSalary;
+  }
+  return nextForm;
+}
+
 function normalizeYesNo(value: string): "yes" | "no" | "unknown" {
   const lowered = value.toLowerCase();
   if (lowered.startsWith("y")) {
@@ -296,32 +926,6 @@ function normalizeYesNo(value: string): "yes" | "no" | "unknown" {
     return "no";
   }
   return "unknown";
-}
-
-function validateForm(form: BasicFormState): string | null {
-  if (form.housePropertyHasIncome === "yes") {
-    const propertyCount = Number(form.housePropertyCount);
-    if (!Number.isFinite(propertyCount) || propertyCount < 1) {
-      return "Please enter the number of house properties when house property income/details are marked yes.";
-    }
-  }
-
-  if (form.has80C === "yes" && !isValidAmount(form.deduction80CAmount)) {
-    return "Please enter a valid Section 80C deduction amount.";
-  }
-  if (form.has80D === "yes" && !isValidAmount(form.deduction80DAmount)) {
-    return "Please enter a valid Section 80D deduction amount.";
-  }
-
-  return null;
-}
-
-function isValidAmount(value: string): boolean {
-  if (value.trim() === "") {
-    return false;
-  }
-  const amount = Number(value);
-  return Number.isFinite(amount) && amount >= 0;
 }
 
 function normalizeSelectAnswer(value: string, allowed: string[]): string {
@@ -334,6 +938,10 @@ function isUnresolved(value: string): boolean {
   return ["unknown", "not sure", "not_sure", "unsure", "i don't know", "dont know", "don't know"].some(
     (phrase) => lowered.includes(phrase),
   );
+}
+
+function isExportReadyForFiling(itrExport: ItrExport | null): boolean {
+  return itrExport?.status === "ready_for_download" && itrExport.validation_result.status === "passed";
 }
 
 function getProgressState({

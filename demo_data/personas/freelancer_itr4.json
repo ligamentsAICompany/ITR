@@ -1,0 +1,34 @@
+{
+  "id": "freelancer_itr4",
+  "data_classification": "synthetic_demo_only",
+  "live_filing_enabled": false,
+  "scenario": "Resident freelancer using presumptive taxation",
+  "candidate_itr": "ITR-4",
+  "taxpayer": {
+    "name": "Demo Freelance Consultant",
+    "pan": "FREEL1234D",
+    "aadhaar": "888877776666",
+    "residency": "resident",
+    "entity_type": "individual"
+  },
+  "income": {
+    "gross_receipts": 1850000,
+    "presumptive_income": 925000,
+    "other_sources_interest": 18000,
+    "capital_gains": 0,
+    "foreign_assets": false
+  },
+  "deductions": {
+    "section_80c": 120000,
+    "section_80d": 18000
+  },
+  "tax_paid": {
+    "tds_other": 72000,
+    "advance_tax": 25000
+  },
+  "documents": [
+    "documents/ais_sample.csv",
+    "documents/form26as_sample.csv"
+  ],
+  "demo_notes": "Shows pilot handling for presumptive income and reviewer confirmation before mock filing."
+}

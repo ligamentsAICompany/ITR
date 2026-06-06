@@ -1,0 +1,8 @@
+field,value,source_note
+employee_name,Demo Salaried User,Synthetic Form 16
+pan,ABCDE1234F,Synthetic PAN
+gross_salary,1200000,Synthetic salary
+standard_deduction,50000,Synthetic deduction
+professional_tax,2400,Synthetic deduction
+tds_salary,92000,Synthetic TDS
+employer_name,Demo Tech Pvt Ltd,Synthetic employer

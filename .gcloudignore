@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+.local_demo_artifacts
+.pytest_cache
+.ruff_cache
+__pycache__
+*.pyc
+node_modules
+frontend/node_modules
+frontend/.next
+frontend/.test-build
